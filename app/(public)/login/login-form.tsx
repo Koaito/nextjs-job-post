@@ -4,27 +4,13 @@
 // Server Action mà không mất input người dùng đã gõ.
 
 import { useActionState } from "react";
-import {
-  loginAction,
-  resendVerificationAction,
-  type AuthActionState,
-} from "@/lib/actions/auth-actions";
-import { useState, useTransition } from "react";
+import { loginAction, type AuthActionState } from "@/lib/actions/auth-actions";
+import { ResendVerificationForm } from "@/components/resend-verification-form";
 
 const initialState: AuthActionState = {};
 
 export function LoginForm({ nextPath }: { nextPath?: string }) {
   const [state, formAction, isPending] = useActionState(loginAction, initialState);
-  const [resendMessage, setResendMessage] = useState<string | null>(null);
-  const [isResending, startResendTransition] = useTransition();
-
-  function handleResend() {
-    if (!state.resendEmail) return;
-    startResendTransition(async () => {
-      const res = await resendVerificationAction(state.resendEmail!);
-      setResendMessage(res.message);
-    });
-  }
 
   return (
     <form action={formAction} className="space-y-4">
@@ -63,19 +49,12 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
 
           {/* Khớp show_resend ở Flask: chỉ hiện khi lỗi là email chưa
               xác thực (error_code === "email_not_verified"), không dò
-              theo nội dung message (Phụ lục D của plan). */}
+              theo nội dung message (Phụ lục D của plan). Dùng chung
+              component với nhánh "hết hạn" của /verify-email. */}
           {state.showResend && (
-            <button
-              type="button"
-              onClick={handleResend}
-              disabled={isResending}
-              className="mt-2 underline disabled:opacity-50"
-            >
-              {isResending ? "Đang gửi..." : "Gửi lại email xác thực"}
-            </button>
-          )}
-          {resendMessage && (
-            <p className="mt-2 text-green-800">{resendMessage}</p>
+            <div className="mt-2">
+              <ResendVerificationForm email={state.resendEmail} />
+            </div>
           )}
         </div>
       )}
