@@ -61,10 +61,19 @@ export const refresh = (refreshToken: string) =>
     body: JSON.stringify({ refresh_token: refreshToken }),
   });
 
-export const getMe = (accessToken: string) =>
-  authRawFetch<BackendUser>("/auth/me", {
+/**
+ * GET /auth/me — backend trả UserOut (KHÔNG có field `is_staff`, xem
+ * lib/api/types-manual.ts), nên tự tính thêm ở đây trước khi trả ra
+ * ngoài. Mọi nơi khác trong app (session.ts, auth-guard.ts, route
+ * handlers...) dựa vào is_staff đã tính sẵn này, không tự suy lại
+ * `role !== "user"` rải rác nhiều chỗ.
+ */
+export const getMe = async (accessToken: string): Promise<BackendUser> => {
+  const user = await authRawFetch<Omit<BackendUser, "is_staff">>("/auth/me", {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
+  return { ...user, is_staff: user.role !== "user" };
+};
 
 /**
  * PATCH /auth/me — cho user tự sửa full_name/phone/track của chính
@@ -80,3 +89,21 @@ export const updateMe = (data: { full_name: string; phone?: string; track?: stri
   });
 
 export const logout = () => callAuthed<void>("/auth/logout", { method: "POST" });
+
+/**
+ * POST /auth/change-password — CẦN auth (đi qua callAuthed, tự refresh
+ * token nếu cần). `old_password` chỉ optional khi must_change_password
+ * đang true (Route Handler không tự đoán trước, để backend quyết định
+ * và trả lỗi `AUTH_OLD_PASSWORD_INCORRECT` (401) nếu thiếu/sai khi thật
+ * ra bắt buộc — xem api/routers/auth_session.py::change_password() bên
+ * Scrap_JD). Backend tự thu hồi TOÀN BỘ refresh token + clear
+ * active_session_id sau khi đổi thành công — Route Handler gọi hàm này
+ * (app/api/auth/change-password/route.ts) có trách nhiệm tự xoá cookie
+ * phiên NGAY sau khi gọi thành công, không đợi request kế tiếp tự phát
+ * hiện phiên đã chết.
+ */
+export const changePassword = (data: { old_password?: string; new_password: string }) =>
+  callAuthed<BackendUser>("/auth/change-password", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });

@@ -1,21 +1,60 @@
 "use client";
 // app/(public)/register/register-form.tsx
+// 22/09: đổi từ Server Action (registerAction) sang gọi Route Handler
+// app/api/auth/register/route.ts qua fetch, khớp quyết định chuyển
+// toàn bộ auth sang kiến trúc Route Handler.
 
-import { useActionState } from "react";
-import {
-  registerAction,
-  type AuthActionState,
-} from "@/lib/actions/auth-actions";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { INDUSTRIES, TRACK_OTHER } from "@/lib/constants";
 
-const initialState: AuthActionState = {};
-
 export function RegisterForm() {
-  const [state, formAction, isPending] = useActionState(registerAction, initialState);
-  const v = state.values ?? {};
+  const router = useRouter();
+  const [values, setValues] = useState({
+    full_name: "",
+    email: "",
+    password: "",
+    password_confirm: "",
+    phone: "",
+    track: "",
+  });
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, setIsPending] = useState(false);
+
+  function update<K extends keyof typeof values>(key: K, value: string) {
+    setValues((v) => ({ ...v, [key]: value }));
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setIsPending(true);
+
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+      const data = await res.json();
+
+      if (!data.ok) {
+        setError(data.message ?? "Đăng ký thất bại, vui lòng thử lại.");
+        setIsPending(false);
+        return;
+      }
+
+      // Route Handler không giữ được flash message như Flask session,
+      // nên /login tự đọc ?registered=1&email=... để hiện thông báo.
+      router.push(`/login?registered=1&email=${encodeURIComponent(data.email)}`);
+    } catch {
+      setError("Không thể kết nối tới máy chủ, vui lòng thử lại.");
+      setIsPending(false);
+    }
+  }
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label htmlFor="full_name" className="mb-1 block text-sm font-medium">
           Họ và tên
@@ -25,7 +64,8 @@ export function RegisterForm() {
           name="full_name"
           type="text"
           required
-          defaultValue={v.full_name ?? ""}
+          value={values.full_name}
+          onChange={(e) => update("full_name", e.target.value)}
           className="w-full rounded-md border px-3 py-2 text-sm"
         />
       </div>
@@ -39,7 +79,8 @@ export function RegisterForm() {
           name="email"
           type="email"
           required
-          defaultValue={v.email ?? ""}
+          value={values.email}
+          onChange={(e) => update("email", e.target.value)}
           className="w-full rounded-md border px-3 py-2 text-sm"
         />
       </div>
@@ -54,6 +95,8 @@ export function RegisterForm() {
           type="password"
           required
           minLength={8}
+          value={values.password}
+          onChange={(e) => update("password", e.target.value)}
           className="w-full rounded-md border px-3 py-2 text-sm"
         />
       </div>
@@ -68,6 +111,8 @@ export function RegisterForm() {
           type="password"
           required
           minLength={8}
+          value={values.password_confirm}
+          onChange={(e) => update("password_confirm", e.target.value)}
           className="w-full rounded-md border px-3 py-2 text-sm"
         />
       </div>
@@ -80,7 +125,8 @@ export function RegisterForm() {
           id="phone"
           name="phone"
           type="text"
-          defaultValue={v.phone ?? ""}
+          value={values.phone}
+          onChange={(e) => update("phone", e.target.value)}
           className="w-full rounded-md border px-3 py-2 text-sm"
         />
       </div>
@@ -92,7 +138,8 @@ export function RegisterForm() {
         <select
           id="track"
           name="track"
-          defaultValue={v.track ?? ""}
+          value={values.track}
+          onChange={(e) => update("track", e.target.value)}
           className="w-full rounded-md border px-3 py-2 text-sm"
         >
           <option value="">-- Chọn ngành --</option>
@@ -105,9 +152,9 @@ export function RegisterForm() {
         </select>
       </div>
 
-      {state.error && (
+      {error && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">
-          {state.error}
+          {error}
         </p>
       )}
 

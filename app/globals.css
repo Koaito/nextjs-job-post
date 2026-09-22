@@ -4,12 +4,65 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* 22/09 — map token thương hiệu từ 00-tokens.css bản Flask (mindx-jobs)
+   vào theme shadcn/Tailwind v4. Đặt tên KHÁC hẳn tên biến gốc bên Flask
+   (tiền tố --brand-*) để tránh đụng độ với tên biến shadcn/Tailwind đã
+   dùng cho mục đích khác (vd Flask --accent là màu cam thương hiệu,
+   nhưng shadcn --accent lại là "màu nền hover nhạt" — 2 khái niệm khác
+   nhau dù trùng tên). Bảng --brand-* dưới đây chỉ là bản sao GIÁ TRỊ
+   GỐC để tham chiếu, phần map thật vào slot shadcn nằm ở :root bên
+   dưới. Chỉ copy giá trị (Flask dùng để THAM KHẢO theo đúng yêu cầu),
+   không import thẳng file CSS gốc.
+   Nguồn: mindx-jobs/public/css/00-tokens.css, mindx-jobs/public/css/01-sidebar.css. */
+:root {
+  --brand-bg: #EEF2F0;
+  --brand-surface: #FFFFFF;
+  --brand-ink: #101E1A;
+  --brand-ink-soft: #52625C;
+  --brand-muted-text: #8A968F;
+  --brand-border: #DCE4DF;
+  --brand-accent: #FF5A36;
+  --brand-accent-soft: #FFE6DC;
+  --brand-teal: #0F766E;
+  --brand-teal-soft: #D9F0EB;
+  --brand-amber: #B9790A;
+  --brand-amber-soft: #FBEBD0;
+  --brand-blue: #2454B8;
+  --brand-blue-soft: #E1E9FA;
+  /* Sidebar Flask là NỀN TỐI (khác card/surface trắng) — xem
+     01-sidebar.css: .sidebar { background: var(--ink); color: #EAF2EF }. */
+  --brand-sidebar-fg: #EAF2EF;
+  --brand-sidebar-border: rgba(255, 255, 255, 0.12);
+  --brand-sidebar-hover: rgba(255, 255, 255, 0.06);
+
+  /* Thang khoảng cách/bề rộng — copy nguyên giá trị từ 00-tokens.css
+     (Flask, refactor #2, 08/2026). CHƯA wire vào @theme làm util
+     Tailwind (p-1..p-8) — để dạng biến CSS thuần trước, dùng qua
+     arbitrary value (vd p-[var(--space-4)]) hoặc style={} cho tới khi
+     component thật cần (Nhóm 1 trở đi) mới quyết có đáng generate
+     thành 1 bộ util riêng hay không. */
+  --space-1: 4px;
+  --space-2: 6px;
+  --space-3: 8px;
+  --space-4: 12px;
+  --space-5: 16px;
+  --space-6: 18px;
+  --space-7: 24px;
+  --space-8: 28px;
+  --card-pad-y: 26px;
+  --card-pad-x: 28px;
+  --card-gap: 18px;
+  --card-min-w: 900px;
+  --form-grid-gap-row: 14px;
+  --form-grid-gap-col: 18px;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-mono-brand);
+  --font-heading: var(--font-display);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -39,6 +92,8 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  /* --radius gốc đổi từ 0.625rem (mặc định shadcn) -> 14px (Flask
+     --radius, 00-tokens.css) ở khối :root ngay bên dưới. */
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -49,40 +104,58 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --background: var(--brand-bg);
+  --foreground: var(--brand-ink);
+  --card: var(--brand-surface);
+  --card-foreground: var(--brand-ink);
+  --popover: var(--brand-surface);
+  --popover-foreground: var(--brand-ink);
+  /* shadcn --primary = màu CTA chính -> map thẳng --accent cam thương
+     hiệu của Flask (KHÔNG phải shadcn --accent, xem giải thích ở đầu
+     file). */
+  --primary: var(--brand-accent);
+  --primary-foreground: #FFFFFF;
+  --secondary: var(--brand-teal);
+  --secondary-foreground: #FFFFFF;
+  /* Flask không có riêng 1 "nền muted" tách khỏi --bg -> dùng lại --bg
+     (đã nhạt sẵn, đủ phân biệt với --card trắng). */
+  --muted: var(--brand-bg);
+  --muted-foreground: var(--brand-muted-text);
+  /* shadcn --accent = nền hover/highlight nhạt (khác --primary) -> map
+     bản "-soft" cùng tông cam cho nhất quán thương hiệu. */
+  --accent: var(--brand-accent-soft);
+  --accent-foreground: var(--brand-accent);
+  /* Flask KHÔNG có token màu lỗi/nguy hiểm riêng trong 00-tokens.css —
+     giữ nguyên đỏ mặc định của shadcn (không tự bịa 1 màu không có căn
+     cứ từ Flask). Cần chốt lại nếu Nhóm 2+ (xoá cứng contact, huỷ ứng
+     tuyển...) muốn 1 màu đỏ khớp thương hiệu hơn. */
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --border: var(--brand-border);
+  --input: var(--brand-border);
+  --ring: var(--brand-accent);
+  --chart-1: var(--brand-teal);
+  --chart-2: var(--brand-amber);
+  --chart-3: var(--brand-blue);
+  --chart-4: var(--brand-accent);
+  --chart-5: var(--brand-ink-soft);
+  --radius: 14px;
+  /* Sidebar Flask nền tối (--ink), khác toàn bộ phần còn lại của theme
+     (nền sáng) — xem 01-sidebar.css. */
+  --sidebar: var(--brand-ink);
+  --sidebar-foreground: var(--brand-sidebar-fg);
+  --sidebar-primary: var(--brand-accent);
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: var(--brand-sidebar-hover);
+  --sidebar-accent-foreground: var(--brand-sidebar-fg);
+  --sidebar-border: var(--brand-sidebar-border);
+  --sidebar-ring: var(--brand-accent);
 }
 
+/* 00-tokens.css bản Flask KHÔNG định nghĩa dark mode (chỉ 1 theme
+   sáng duy nhất) — giữ nguyên bảng .dark mặc định của shadcn làm dự
+   phòng (chưa có yêu cầu nào trong plan về dark mode cho đợt migrate
+   này), không tự chế màu tối theo bảng --brand-* ở trên vì không có
+   căn cứ từ bản gốc. */
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);

@@ -1,33 +1,33 @@
 // lib/api/types-manual.ts
 //
-// TẠM THỜI viết tay — chỉ chứa các type tối thiểu cần cho Phần 2 (auth
-// layer). Theo Phần 1 mục 2.5 của plan, các type còn lại (Job, Company,
-// Contact...) PHẢI sinh tự động bằng `openapi-typescript` từ
-// /openapi.json của Scrap_JD, không tự gõ tay.
-//
-// Cách generate (làm 1 lần, không chạy trong CI):
-//   1. Set ENABLE_DOCS=true tạm thời ở Scrap_JD (local/staging, KHÔNG
-//      bật ở production — xem Phần 1 mục 2.5).
-//   2. npx openapi-typescript http://localhost:8000/openapi.json \
-//        -o lib/api/types.ts
-//   3. Tắt lại ENABLE_DOCS.
-//
-// Sau khi có lib/api/types.ts thật, có thể xoá file này và import
-// BackendUser cùng các type khác trực tiếp từ types.ts.
+// PHÁT HIỆN 22/09 khi rà lại 4 mục "cần rà lại" của checklist: file này
+// từng tồn tại (commit 5894742, viết tay tạm thời trước khi có
+// types.ts), nhưng đã bị XOÁ khỏi working tree (git status báo
+// "deleted", chưa commit) sau khi lib/api/types.ts được generate thật
+// bằng openapi-typescript — có vẻ ai đó xoá theo đúng gợi ý trong
+// comment cũ của chính file này ("sau khi có types.ts thật, có thể xoá
+// file này và import BackendUser trực tiếp từ types.ts"), nhưng lib/
+// session.ts, lib/auth-guard.ts, lib/api/auth.ts vẫn đang import từ
+// đường dẫn này -> toàn bộ auth layer không compile được. Khôi phục lại
+// file, nhưng lần này BackendUser/TokenPair lấy đúng từ types.ts (schema
+// thật OpenAPI) thay vì gõ tay lại, theo đúng tinh thần Phần 1 mục 2.5
+// của plan (chỉ khác: thêm field `is_staff` — KHÔNG có trong response
+// backend, tự tính ở phía Next.js, xem lib/api/auth.ts::getMe()).
 
-export interface BackendUser {
-  ss_user_id: string;
-  email: string;
-  full_name: string;
-  role: "user" | "ss_team" | "admin";
-  is_active: boolean;
-  is_staff: boolean; // true nếu role là ss_team hoặc admin
-  must_change_password: boolean;
-  phone?: string | null;
-  track?: string | null;
-}
+import type { components } from "./types";
 
-export interface TokenPair {
-  access_token: string;
-  refresh_token: string;
-}
+/**
+ * Khớp UserOut (Scrap_JD) + thêm `is_staff` (role !== "user") — field
+ * tiện dùng ở auth-guard.ts/UI, backend không trả field này nên PHẢI tự
+ * gán khi map response, không tin thẳng `res.json()` là đủ field.
+ */
+export type BackendUser = components["schemas"]["UserOut"] & {
+  is_staff: boolean;
+};
+
+/** Khớp TokenPairOut (Scrap_JD) — access_token/refresh_token dùng ở
+ *  lib/session.ts, must_change_password ở đây chỉ mang tính tham khảo
+ *  lúc login (giá trị đáng tin cậy hơn vẫn là must_change_password đọc
+ *  từ getMe() ngay sau đó, vì có thể lệch nếu admin đổi cờ này giữa lúc
+ *  access token cũ còn hiệu lực). */
+export type TokenPair = components["schemas"]["TokenPairOut"];

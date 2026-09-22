@@ -1,6 +1,7 @@
 // app/(public)/login/page.tsx
 import { getCurrentUser } from "@/lib/session";
 import { redirect } from "next/navigation";
+import { safeInternalPath } from "@/lib/auth-guard";
 import { LoginForm } from "./login-form";
 
 export default async function LoginPage({
@@ -15,6 +16,13 @@ export default async function LoginPage({
   }
 
   const params = await searchParams;
+  // 22/09: LoginForm giờ là Client Component gọi fetch trực tiếp (xem
+  // login-form.tsx), không còn qua Server Action nơi safeInternalPath()
+  // từng được gọi (loginAction cũ) -> validate ngay tại đây, ở Server
+  // Component, TRƯỚC khi đưa "next" xuống client. Vẫn cùng 1 hàm
+  // safeInternalPath() dùng ở requireUser() (Phần 2 mục 4 của plan),
+  // không viết thêm 1 bản chặn open-redirect riêng.
+  const nextPath = safeInternalPath(params.next);
 
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
@@ -28,7 +36,7 @@ export default async function LoginPage({
           </p>
         )}
 
-        <LoginForm nextPath={params.next} />
+        <LoginForm nextPath={nextPath} />
 
         <p className="mt-4 text-center text-sm text-muted-foreground">
           Chưa có tài khoản?{" "}

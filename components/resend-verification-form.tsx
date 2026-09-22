@@ -2,12 +2,13 @@
 // components/resend-verification-form.tsx
 //
 // Nhánh "hết hạn" của /verify-email và show_resend ở /login dùng chung
-// đúng 1 backend action (resend_verification) — viết thành 1 component
-// nhỏ dùng lại ở cả 2 nơi thay vì viết trùng logic resend 2 lần (Nhóm 0
-// của plan).
+// đúng 1 Route Handler (app/api/auth/resend-verification/route.ts) —
+// viết thành 1 component nhỏ dùng lại ở cả 2 nơi thay vì viết trùng
+// logic resend 2 lần (Nhóm 0 của plan). 22/09: đổi từ gọi Server Action
+// (resendVerificationAction) sang fetch Route Handler, khớp quyết định
+// chuyển toàn bộ auth sang kiến trúc Route Handler.
 
-import { useState, useTransition } from "react";
-import { resendVerificationAction } from "@/lib/actions/auth-actions";
+import { useState } from "react";
 
 export function ResendVerificationForm({
   email: knownEmail,
@@ -20,14 +21,23 @@ export function ResendVerificationForm({
 }) {
   const [emailInput, setEmailInput] = useState("");
   const [message, setMessage] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [isPending, setIsPending] = useState(false);
 
-  function handleSubmit(formData: FormData) {
-    const email = knownEmail ?? String(formData.get("email") ?? "");
-    startTransition(async () => {
-      const res = await resendVerificationAction(email);
-      setMessage(res.message);
-    });
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const email = knownEmail ?? emailInput;
+    setIsPending(true);
+    try {
+      const res = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      setMessage(data.message);
+    } finally {
+      setIsPending(false);
+    }
   }
 
   if (message) {
@@ -35,7 +45,7 @@ export function ResendVerificationForm({
   }
 
   return (
-    <form action={handleSubmit} className="space-y-3">
+    <form onSubmit={handleSubmit} className="space-y-3">
       {knownEmail ? (
         <button
           type="submit"
