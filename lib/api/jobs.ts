@@ -11,6 +11,7 @@ import {
   JOB_STATUS_LABELS,
   JOB_STATUS_LABELS_REV,
   WORK_TYPE_LABELS,
+  SALARY_TYPE_LABELS,
 } from "@/lib/constants";
 
 export type JobOut = components["schemas"]["JobOut"];
@@ -86,21 +87,36 @@ export interface JobCardData {
   jdLink: string;
 }
 
-/** Khớp _fmt_salary() bên crawler_client/jobs.py — period_suffix CHỈ
- *  gắn "/ Năm" khi period=YEAR, không gắn "/ Tháng" cho case mặc định
- *  (xem README bug "lương '/năm' bị hiểu nhầm thành lương/tháng"). */
+/** Khớp ĐÚNG _fmt_salary() bên crawler_client/jobs.py — bản trước chỉ
+ *  copy 1 nửa hàm gốc (thiếu hẳn phần salary_type), gây mất thông tin
+ *  so với Flask dù SALARY_TYPE_LABELS đã có sẵn ở constants.ts:
+ *   - period_suffix CHỈ gắn "/ Năm" khi period=YEAR, không gắn
+ *     "/ Tháng" cho case mặc định (xem README bug "lương '/năm' bị
+ *     hiểu nhầm thành lương/tháng").
+ *   - LUÔN có "(salary_type)" ở cuối khi có min/max (vd "(Khoảng lương)").
+ *   - Khi KHÔNG có cả min lẫn max, trả về salary_type (vd "Không lương")
+ *     thay vì luôn luôn "Thỏa thuận" — Flask fallback "Thỏa thuận" CHỈ
+ *     khi salary_type cũng rỗng.
+ *   - Dùng dấu phẩy ngăn cách hàng nghìn giống Python `{:,.0f}` (không
+ *     phải dấu chấm kiểu `toLocaleString("vi-VN")`) để không đổi cách
+ *     hiển thị con số so với bản Flask hiện tại — thay đổi cách hiển
+ *     thị không nằm trong phạm vi round này. */
 function formatSalary(job: JobOut): string {
   const { salary_min, salary_max } = job;
   const currency = job.currency || "VNĐ";
+  const salaryTypeLabel = SALARY_TYPE_LABELS[job.salary_type || ""] || job.salary_type || "";
   const periodSuffix = (job.salary_period || "MONTH") === "YEAR" ? " / Năm" : "";
 
-  if (!salary_min && !salary_max) return "Thỏa thuận";
+  if (!salary_min && !salary_max) return salaryTypeLabel || "Thỏa thuận";
 
-  const fmt = (n: number) => n.toLocaleString("vi-VN");
-  if (salary_min && salary_max) {
-    return `${fmt(salary_min)} - ${fmt(salary_max)} ${currency}${periodSuffix}`;
-  }
-  return `${fmt((salary_min || salary_max)!)} ${currency}${periodSuffix}`;
+  const fmt = (n: number) =>
+    n.toLocaleString("en-US", { maximumFractionDigits: 0 });
+  const amount =
+    salary_min && salary_max
+      ? `${fmt(salary_min)} - ${fmt(salary_max)}`
+      : fmt((salary_min || salary_max)!);
+
+  return `${amount} ${currency}${periodSuffix} (${salaryTypeLabel})`.trim();
 }
 
 export function toJobCardData(job: JobOut): JobCardData {

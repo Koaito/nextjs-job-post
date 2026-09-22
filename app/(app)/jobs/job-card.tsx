@@ -24,7 +24,17 @@ function formatDeadline(iso: string | null): string | null {
 export function JobCard({ job }: { job: JobCardData }) {
   const industryStyle = INDUSTRY_BADGE_STYLES[job.industry] ?? INDUSTRY_BADGE_FALLBACK;
   const deadline = formatDeadline(job.deadline);
-  const isManual = job.source === "MANUAL" || !job.source;
+  // Khớp ĐÚNG _job_card.html: 2 điều kiện tách biệt, không gộp chung
+  // 1 biến "isManual" duy nhất như bản trước — Flask không hề coi
+  // "source rỗng" là "MANUAL", 2 khái niệm khác nhau:
+  //   - "Nguồn: …" chỉ hiện khi job.source VÀ job.source != 'MANUAL'
+  //   - "Xem JD gốc" chỉ hiện khi job.jd_link VÀ job.source != 'MANUAL'
+  //     (không đòi source phải có giá trị)
+  // Gộp chung "!job.source" vào "isManual" trước đây làm ẩn nhầm nút
+  // "Xem JD gốc" cho job có jdLink nhưng source rỗng — trường hợp có
+  // thật với job crawl cũ (source_name null trước 08/2026, xem comment
+  // ở lib/api/jobs.ts::toJobCardData nguồn JobOut.source_name).
+  const sourceIsManual = job.source === "MANUAL";
 
   return (
     <article className="flex flex-col gap-3 rounded-[var(--radius)] border border-border bg-card p-5 shadow-sm">
@@ -66,10 +76,10 @@ export function JobCard({ job }: { job: JobCardData }) {
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
         <span>💰 {job.salaryDisplay}</span>
         {deadline && <span>⏳ Hạn: {deadline}</span>}
-        {!isManual && <span>Nguồn: {job.source}</span>}
+        {job.source && !sourceIsManual && <span>Nguồn: {job.source}</span>}
       </div>
 
-      {!isManual && job.jdLink && (
+      {job.jdLink && !sourceIsManual && (
         <a
           href={job.jdLink}
           target="_blank"

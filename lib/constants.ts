@@ -16,9 +16,13 @@ export const INDUSTRIES = [
 
 export const TRACK_OTHER = "Khác / Chưa xác định";
 
+// Khớp ĐÚNG ROLE_LABELS trong constants.py bên Flask ("Team SS", không
+// phải "SS Team" — thứ tự chữ khác nhau, dễ gõ nhầm vì đọc xuôi tai
+// hơn, nhưng đây là nhãn hiển thị cho người dùng nên phải giữ nguyên
+// văn để không lệch với mọi nơi khác trong hệ thống đang dùng nhãn cũ).
 export const ROLE_LABELS: Record<string, string> = {
   user: "Học viên",
-  ss_team: "SS Team",
+  ss_team: "Team SS",
   admin: "Admin",
 };
 
