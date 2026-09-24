@@ -4,24 +4,28 @@
 // Khác Flask (1 cookie session ký server-side chứa cả access + refresh
 // token), ở đây tách thành 2 cookie httpOnly riêng — không dùng
 // NEXT_PUBLIC_* hay localStorage cho 2 token này (xem Phần 2 mục 1).
+//
+// LƯU Ý (Round sửa refresh): tên cookie/maxAge/options nằm ở
+// lib/auth-cookies.ts, hàm decode JWT nằm ở lib/jwt.ts — cả 2 tách riêng
+// khỏi file này để middleware.ts (chạy Edge runtime, không import được
+// file này vì nó đụng next/headers) vẫn dùng chung được, không phải viết
+// lại 1 bản lệch. Từ giờ file refresh CHỦ ĐỘNG duy nhất khi vào tới
+// Server Component gần như luôn thấy access token đã được middleware.ts
+// refresh sẵn — nhánh refresh dưới đây trở thành lớp dự phòng (middleware
+// bị skip do matcher, hoặc token hết hạn ngay giữa lúc render).
 
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { getMe, refresh as refreshApi } from "@/lib/api/auth";
 import type { BackendUser } from "@/lib/api/types-manual";
-
-const ACCESS_COOKIE = "mx_access";
-const REFRESH_COOKIE = "mx_refresh";
-
-const ACCESS_MAX_AGE = 30 * 60; // 30 phút, khớp access token JWT
-const REFRESH_MAX_AGE = 30 * 24 * 60 * 60; // 30 ngày, khớp refresh token
-
-const COOKIE_OPTS = {
-  httpOnly: true,
-  secure: true,
-  sameSite: "lax" as const,
-  path: "/",
-};
+import { isExpiredSoon } from "@/lib/jwt";
+import {
+  ACCESS_COOKIE,
+  REFRESH_COOKIE,
+  ACCESS_MAX_AGE,
+  REFRESH_MAX_AGE,
+  COOKIE_OPTS,
+} from "@/lib/auth-cookies";
 
 export async function getTokens() {
   const jar = await cookies();
@@ -41,30 +45,6 @@ export async function clearAuthCookies() {
   const jar = await cookies();
   jar.delete(ACCESS_COOKIE);
   jar.delete(REFRESH_COOKIE);
-}
-
-/** Giải mã phần payload của JWT (KHÔNG verify chữ ký — chỉ đọc `exp` để
- *  quyết định có cần refresh hay chưa; việc verify thật do backend làm
- *  khi request thật sự được gửi lên). */
-function decodeJwtExp(token: string): number | null {
-  try {
-    const payloadB64 = token.split(".")[1];
-    const payload = JSON.parse(
-      Buffer.from(payloadB64, "base64url").toString("utf-8"),
-    );
-    return typeof payload.exp === "number" ? payload.exp : null;
-  } catch {
-    return null;
-  }
-}
-
-/** Coi là "sắp hết hạn" nếu còn dưới 30 giây — chừa khoảng đệm cho thời
- *  gian request thật sự chạy tới lúc backend nhận được. */
-function isExpiredSoon(token: string): boolean {
-  const exp = decodeJwtExp(token);
-  if (exp === null) return true; // không đọc được exp -> coi như hết hạn, an toàn hơn
-  const nowSeconds = Date.now() / 1000;
-  return exp - nowSeconds < 30;
 }
 
 /**
