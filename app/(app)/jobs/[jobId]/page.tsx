@@ -4,10 +4,10 @@
 // đầu file, chỉ đọc getCurrentUser() (không redirect) để tự rẽ nhánh
 // UI staff/học viên/khách, đúng cách jobs/page.tsx đã làm.
 //
-// CHƯA làm ở round này (xem comment trong apply-section.tsx): apply/
-// withdraw CV, already_applied. Đã làm: applicants/savers (staff),
-// đổi trạng thái + đóng job (staff, note tuỳ chọn), save/unsave job
-// (học viên), is_duplicate_candidate (staff).
+// CHƯA làm (Nhóm 5, xem comment trong apply-section.tsx): apply/
+// withdraw CV, already_applied, nút "Xem CV" của staff. Đã làm:
+// applicants/savers (staff), đổi trạng thái + đóng job (staff, note
+// tuỳ chọn), save/unsave job (học viên).
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -198,7 +198,6 @@ export default async function JobDetailPage({
             <ApplySection
               jobId={job.id}
               isAuthenticated={isAuthenticated}
-              isStaff={isStaff}
               initialSaved={savedJobIds.has(job.id)}
             />
           )}
