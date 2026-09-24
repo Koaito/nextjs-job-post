@@ -25,6 +25,13 @@ export interface paths {
          *     limit này — nếu sau này thấy cuộn nhanh hay chạm rate limit, tăng
          *     limit riêng cho route này hoặc tăng page-size mặc định phía
          *     frontend cho chế độ vô hạn, không tăng cho mọi client.
+         *
+         *     ids (thêm 09/2026, Phần 5 mục 10 của plan migrate Next.js): dùng khi
+         *     đã có sẵn 1 tập job_id cụ thể (vd trang "Job đã lưu") và chỉ cần lấy
+         *     đúng nội dung các job đó trong 1 lần gọi, thay vì N lần GET
+         *     /jobs/{id} riêng lẻ. Vẫn tôn trọng limit/offset/cursor như mọi filter
+         *     khác — nếu muốn lấy đủ toàn bộ id đã liệt kê, tự truyền limit >=
+         *     số lượng id.
          */
         get: operations["list_jobs_jobs_get"];
         put?: never;
@@ -43,6 +50,11 @@ export interface paths {
          *     IDEMPOTENT: gọi lại nhiều lần với data y hệt (company_id + job_title
          *     + level_code + province_name giống nhau) sẽ KHÔNG tạo job trùng —
          *     trả về đúng job đã có (xem db.create_manual_job()).
+         *
+         *     Response kèm `was_existing` (cùng dạng POST /companies): true = job trả
+         *     về là job CŨ, mọi dữ liệu vừa gửi (lương, deadline, mô tả...) bị bỏ,
+         *     KHÔNG ghi đè lên job cũ — client nên báo cho người dùng biết thay vì
+         *     hiện "đã tạo". Status vẫn 201 cả 2 trường hợp (giữ nguyên hành vi cũ).
          *
          *     BẮT BUỘC đăng nhập VÀ role 'ss_team' trở lên (require_role("ss_team"),
          *     đổi từ chỉ-cần-đăng-nhập sang có phân cấp — 08/2026, xem
@@ -88,6 +100,32 @@ export interface paths {
          *     giải thích ở /companies/data-health.
          */
         get: operations["get_job_data_health_jobs_data_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/applications/{application_id}/cv-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Cv Signed Url
+         * @description Staff lấy Signed URL để tải và xem CV học viên.
+         *
+         *     Rate limit 30/minute theo user_id (thêm 08/2026) — mỗi lần gọi tốn
+         *     1 lệnh gọi thật tới storage provider để sinh signed URL mới. Mốc
+         *     30/minute chỉ nhằm chặn lỗi loop/script gọi lặp ngoài ý muốn, không
+         *     ảnh hưởng thao tác bình thường của staff (xem qua nhiều CV liên
+         *     tục trong lúc duyệt hồ sơ vẫn thoải mái nằm trong hạn mức này).
+         */
+        get: operations["get_cv_signed_url_jobs_applications__application_id__cv_url_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -169,6 +207,75 @@ export interface paths {
          *     để biết chi tiết lý do đảo ngược).
          */
         get: operations["list_job_savers_jobs__job_id__saved_jobs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dashboard/insights/students": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Student Insights
+         * @description Tab "Gợi ý học viên": JD sắp hết hạn cần đẩy (deadline còn 7-14
+         *     ngày, chưa ai lưu/ứng tuyển), JD "ế" (thu thập >= 30 ngày, chưa ai
+         *     quan tâm), top 10 kỹ năng 30 ngày gần đây, lương trung bình theo
+         *     ngành/level. Ngày tính theo giờ Việt Nam.
+         */
+        get: operations["get_student_insights_dashboard_insights_students_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dashboard/insights/companies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Company Insights
+         * @description Tab "Doanh nghiệp": công ty tiềm năng cao thiếu/nguội contact,
+         *     contact cần follow-up (im lặng >= followup_days), công ty đang "nở rộ"
+         *     (>= 2 job trong 30 ngày) và công ty "im ắng" (job mới nhất > 75 ngày
+         *     trước).
+         */
+        get: operations["get_company_insights_dashboard_insights_companies_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dashboard/insights/monthly": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Monthly Insights
+         * @description Tab "Báo cáo tháng": số job/công ty mới + % so với tháng trước, job
+         *     hết hạn trong tháng, top 3 ngành + top 5 công ty tuyển nhiều nhất
+         *     tháng này, số ứng tuyển/lưu job + %. "Tháng" theo lịch, giờ Việt Nam
+         *     (cùng cách GET /stats/engagement tính ranh giới tháng).
+         */
+        get: operations["get_monthly_insights_dashboard_insights_monthly_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -432,6 +539,20 @@ export interface paths {
          *     thể) — xoá thật sẽ mất lịch sử liên hệ theo job đó / vỡ FK, xem
          *     docstring ContactHasLinksError ở db.py. Trường hợp này contact vẫn
          *     giữ nguyên trạng thái xoá mềm sau khi gọi route này.
+         *
+         *     BUG FIX (migrate Next.js, Phần 1 mục 3.12 của plan): trước đây route
+         *     này KHÔNG nhận payload nào và KHÔNG gọi log_action() ở bất kỳ đâu —
+         *     cùng 1 hành động nghiệp vụ (xoá hẳn 1 contact khỏi hệ thống) nhưng
+         *     chỉ bước xoá mềm (delete_contact() ở trên) được ghi audit log, bước
+         *     xoá cứng hoàn toàn không để lại dấu vết ai bấm/khi nào/vì sao. Giờ
+         *     dùng lại ĐÚNG schema ContactDeleteRequest đã có ở delete_contact()
+         *     (note bắt buộc vô điều kiện, không tạo schema mới) và ghi audit log
+         *     action_type="DELETE_CONTACT" — CÙNG action_type với xoá mềm là chủ
+         *     đích (2 dòng log DELETE_CONTACT liên tiếp trên cùng entity_id, phân
+         *     biệt bằng thời điểm, đủ để đọc ra "xoá mềm lúc nào, xoá cứng lúc
+         *     nào" khi tra lại lịch sử — không cần action_type riêng như
+         *     HARD_DELETE_CONTACT). audit_action_enum (sql/schema.sql) đã có sẵn
+         *     giá trị DELETE_CONTACT dùng chung, không cần ALTER TYPE.
          */
         delete: operations["hard_delete_contact_companies__company_id__contacts__contact_id__hard_delete"];
         options?: never;
@@ -945,6 +1066,15 @@ export interface paths {
          *     Response format: {"enum_name": ["VALUE1", "VALUE2", ...]}
          *     Frontend tự quyết định có map sang tiếng Việt hay không (có thể
          *     hardcode map VN ở frontend, nhưng ít nhất danh sách values luôn đúng).
+         *
+         *     `province_name` (thêm 09/2026): danh sách tỉnh/thành HỢP LỆ để chọn
+         *     ở form thêm/sửa job — 34 tỉnh sau sáp nhập + "Khác"/"Remote", đúng
+         *     thứ tự seed trong DB (Bắc -> Nam, KHÔNG sắp theo bảng chữ cái —
+         *     frontend tự sort nếu muốn). Cố ý KHÔNG đọc bảng `provinces` thật:
+         *     route này không đọc DB (xem test_get_enums_has_no_parameters), và
+         *     bảng thật có thể còn dòng tên tỉnh CŨ chỉ để giữ tham chiếu dữ liệu
+         *     lịch sử — không được cho chọn lại. Danh sách này được test tự động
+         *     so khớp với sql/schema.sql + migration + province_alias.py.
          */
         get: operations["get_enums_enums_get"];
         put?: never;
@@ -1269,32 +1399,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/me/applications/{application_id}/cv-url": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Cv Signed Url
-         * @description Staff lấy Signed URL để tải và xem CV học viên.
-         *
-         *     Rate limit 30/minute theo user_id (thêm 08/2026) — mỗi lần gọi tốn
-         *     1 lệnh gọi thật tới storage provider để sinh signed URL mới. Mốc
-         *     30/minute chỉ nhằm chặn lỗi loop/script gọi lặp ngoài ý muốn, không
-         *     ảnh hưởng thao tác bình thường của staff (xem qua nhiều CV liên
-         *     tục trong lúc duyệt hồ sơ vẫn thoải mái nằm trong hạn mức này).
-         */
-        get: operations["get_cv_signed_url_me_applications__application_id__cv_url_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/me/applications/{job_id}": {
         parameters: {
             query?: never;
@@ -1330,6 +1434,23 @@ export interface paths {
         put?: never;
         /** Save Job */
         post: operations["save_job_me_saved_jobs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/saved-jobs/toggle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Toggle Saved Job */
+        post: operations["toggle_saved_job_me_saved_jobs_toggle_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1662,6 +1783,12 @@ export interface paths {
          *         tự phân biệt qua status_code (không dùng response_model chung
          *         ở decorator vì lý do này).
          *
+         *     Thêm khi migrate Next.js (Phần 1 mục 3.15 của plan): CẢ 2 shape trên
+         *     giờ đều có thêm field "kind" ("message" | "pending_request") tường
+         *     minh trong body, để client có thể rẽ nhánh dựa vào nội dung body
+         *     thay vì chỉ dựa vào status_code — status_code vẫn giữ nguyên 201/202
+         *     như cũ, "kind" chỉ là field bổ sung, không thay thế.
+         *
          *     Thứ tự check (dừng sớm nhất có thể, tránh chạm DB khi không cần):
          *       1. receiver tồn tại + không tự nhắn cho chính mình.
          *       2. Học viên -> học viên: 403 NGAY, trước khi chạm state machine.
@@ -1692,6 +1819,35 @@ export interface paths {
         };
         /** List Conversations */
         get: operations["list_conversations_messages_conversations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/messages/conversations/{partner_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Conversation
+         * @description Tra đúng 1 người đối thoại — tên, role, relationship_status,
+         *     relationship_id — kể cả khi 2 bên CHƯA từng nhắn (khi đó
+         *     last_message_* = null, unread_count = 0, relationship_* = null nếu
+         *     chưa có quan hệ). Thay cho việc client truyền partner_name qua query
+         *     string hoặc kéo cả GET /conversations chỉ để lọc 1 người.
+         *
+         *     404 MESSAGE_PARTNER_NOT_FOUND cho cả 2 trường hợp "không tồn tại" và
+         *     "không được phép thấy" (vd học viên tra học viên khác) — cố ý không
+         *     phân biệt để không lộ user_id nào có thật, xem
+         *     db.get_conversation_with().
+         */
+        get: operations["get_conversation_messages_conversations__partner_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1794,12 +1950,12 @@ export interface paths {
          * Get New Messages
          * @description Polling nhẹ trong lúc mở khung chat — chỉ trả tin id > after_id.
          *
-         *     TODO (khi làm FE, xem backend-scrap-jd-nhan-tin.md §3): response
-         *     header Cache-Control: no-store — chưa set ở đây vì router hiện tại
-         *     trả list trực tiếp qua response_model (FastAPI tự serialize),
-         *     không đi qua Response object thủ công. Nếu cần set header thật,
-         *     đổi return sang JSONResponse(..., headers={"Cache-Control": "no-store"})
-         *     hoặc thêm middleware riêng cho path này.
+         *     Thêm khi migrate Next.js (Phần 5 mục 15 của plan): tự set header
+         *     Cache-Control: no-store ngay tại nguồn qua tham số Response (FastAPI
+         *     tự inject) — trước đây TODO ghi rõ chưa làm được vì route trả list
+         *     trực tiếp qua response_model, giờ dùng response.headers thay vì phải
+         *     đổi hẳn sang JSONResponse thủ công, giữ nguyên response_model và
+         *     shape response cũ.
          */
         get: operations["get_new_messages_messages_since__partner_id__get"];
         put?: never;
@@ -2268,6 +2424,12 @@ export interface components {
             created_at: string;
             /** Read At */
             read_at?: string | null;
+            /**
+             * Kind
+             * @default message
+             * @constant
+             */
+            kind: "message";
         };
         /** CompanyContactCreate */
         CompanyContactCreate: {
@@ -2466,6 +2628,66 @@ export interface components {
              */
             partnership_potential?: string | null;
         };
+        /** CompanyCreateResult */
+        CompanyCreateResult: {
+            /** Company Id */
+            company_id: string;
+            /** Company Name */
+            company_name: string;
+            /** Tax Id */
+            tax_id?: string | null;
+            /** Website */
+            website?: string | null;
+            /** Industry */
+            industry?: string | null;
+            /** Company Size */
+            company_size?: string | null;
+            /** Address */
+            address?: string | null;
+            /** Fanpage Url */
+            fanpage_url?: string | null;
+            /** Linkedin Url */
+            linkedin_url?: string | null;
+            /**
+             * Partnership Potential
+             * @description HIGH | MEDIUM | LOW | UNVERIFIED — staff tự chấm tay qua PATCH /companies/{id}, không có rule tự động gán. UNVERIFIED = mặc định, nghĩa là 'chưa đánh giá', KHÔNG phải 'tiềm năng thấp'.
+             * @default UNVERIFIED
+             */
+            partnership_potential: string;
+            /** Province Name */
+            province_name?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Created By
+             * @description ss_user_id người tạo company này qua POST /companies. null = company crawl tự động.
+             */
+            created_by?: string | null;
+            /**
+             * Updated By
+             * @description ss_user_id người sửa company này GẦN NHẤT qua POST /companies (trùng tax_id, chỉ vá thêm thông tin).
+             */
+            updated_by?: string | null;
+            /**
+             * Is Active
+             * @description false = công ty đã bị xoá mềm qua DELETE /companies/{id} (xem sql/migration_add_company_soft_delete.sql) — GET /companies mặc định không trả company này, xem lại qua ?include_inactive=true.
+             * @default true
+             */
+            is_active: boolean;
+            /**
+             * Was Existing
+             * @description true = company trả về đã tồn tại từ trước (trùng tax_id hoặc tên), request này chỉ vá thêm thông tin, KHÔNG tạo bản ghi mới. false = company vừa được tạo mới thật sự.
+             */
+            was_existing: boolean;
+        };
         /**
          * CompanyDataHealth
          * @description GET /companies/data-health — thay cho việc frontend tự đếm field
@@ -2553,6 +2775,22 @@ export interface components {
             is_active: boolean;
             /** Jobs */
             jobs?: components["schemas"]["JobOut"][];
+        };
+        /** CompanyInsightsOut */
+        CompanyInsightsOut: {
+            /**
+             * Followup Days
+             * @description Ngưỡng đã dùng cho contacts_needing_followup (7 | 14 | 30).
+             */
+            followup_days: number;
+            /** Companies No Contact */
+            companies_no_contact: components["schemas"]["HighPotentialCompanyRow"][];
+            /** Contacts Needing Followup */
+            contacts_needing_followup: components["schemas"]["FollowupContactRow"][];
+            /** Companies Expanding */
+            companies_expanding: components["schemas"]["ExpandingCompanyRow"][];
+            /** Companies Quiet */
+            companies_quiet: components["schemas"]["QuietCompanyRow"][];
         };
         /** CompanyOut */
         CompanyOut: {
@@ -3051,6 +3289,19 @@ export interface components {
             jobs: components["schemas"]["JobEngagementOut"][];
             monthly: components["schemas"]["MonthlyEngagementOut"];
         };
+        /** ExpandingCompanyRow */
+        ExpandingCompanyRow: {
+            /** Company Id */
+            company_id: string;
+            /** Company Name */
+            company_name: string;
+            /** City */
+            city?: string | null;
+            /** Recent Job Count */
+            recent_job_count: number;
+            /** Recent Jobs */
+            recent_jobs: string[];
+        };
         /**
          * ExportPreviewResponse
          * @description Response cho GET /export/{entity_type}/preview — staff xem trước
@@ -3157,6 +3408,29 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
+        /** FollowupContactRow */
+        FollowupContactRow: {
+            /** Contact Id */
+            contact_id: string;
+            /** Contact Name */
+            contact_name: string;
+            /** Job Title */
+            job_title?: string | null;
+            /** Contact Status */
+            contact_status: string;
+            /** Company Id */
+            company_id: string;
+            /** Company Name */
+            company_name: string;
+            /** Last Contacted Date */
+            last_contacted_date?: string | null;
+            /** Collected Date */
+            collected_date?: string | null;
+            /** Quiet Days */
+            quiet_days: number;
+            /** Never Contacted */
+            never_contacted: boolean;
+        };
         /** ForgotPasswordRequest */
         ForgotPasswordRequest: {
             /** Email */
@@ -3166,6 +3440,23 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** HighPotentialCompanyRow */
+        HighPotentialCompanyRow: {
+            /** Company Id */
+            company_id: string;
+            /** Company Name */
+            company_name: string;
+            /** City */
+            city?: string | null;
+            /** Last Contacted */
+            last_contacted?: string | null;
+            /**
+             * Reason
+             * @description no_contact = chưa có contact nào; contact_gone_cold = có contact, từng liên hệ nhưng đã nguội; never_contacted = có contact nhưng chưa từng liên hệ lần nào.
+             * @enum {string}
+             */
+            reason: "no_contact" | "contact_gone_cold" | "never_contacted";
         };
         /**
          * ImportConfirmRequest
@@ -3202,6 +3493,11 @@ export interface components {
             updated: number;
             /** Skipped */
             skipped: number;
+            /**
+             * Reactivated
+             * @default 0
+             */
+            reactivated: number;
         };
         /**
          * ImportUploadResponse
@@ -3344,6 +3640,80 @@ export interface components {
             deadline?: string | null;
             /** @description Mô tả JD chi tiết (job_description/requirements/perks/required_skills) cho job nhập tay */
             parsed_content?: components["schemas"]["ParsedContent"] | null;
+        };
+        /** JobCreateResult */
+        JobCreateResult: {
+            /** Job Id */
+            job_id: string;
+            /** Job Title */
+            job_title: string;
+            /** Matching Industry */
+            matching_industry?: string | null;
+            /** Work Type */
+            work_type?: string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Salary Min */
+            salary_min?: number | null;
+            /** Salary Max */
+            salary_max?: number | null;
+            /** Salary Type */
+            salary_type?: string | null;
+            /**
+             * Salary Period
+             * @description MONTH | YEAR — chu kỳ trả lương của salary_min/salary_max. Job cũ crawl trước 08/2026 (trước khi có cột này) mặc định 'MONTH' ở tầng DB, không phải giá trị đã xác nhận thật.
+             */
+            salary_period?: string | null;
+            /** Deadline */
+            deadline?: string | null;
+            /** Job Status */
+            job_status?: string | null;
+            /** Source Url */
+            source_url?: string | null;
+            /**
+             * Source Name
+             * @description TopCV | VietnamWorks | CareerViet | MANUAL — tên nguồn crawl gần nhất (từ job_sources_log). Trước 08/2026 field này chỉ xuất hiện ở /stats (SourceCount), chưa join vào job list/detail. null = job crawl trước khi có cột này, hoặc chưa từng ghi log nguồn.
+             */
+            source_name?: string | null;
+            /** Company Id */
+            company_id: string;
+            /** Company Name */
+            company_name: string;
+            /** Level Code */
+            level_code?: string | null;
+            /** Province Name */
+            province_name?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Created By
+             * @description ss_user_id người tạo job này qua POST /jobs (JWT bắt buộc từ 08/2026). null = job crawl tự động, không phải người nhập tay.
+             */
+            created_by?: string | null;
+            /**
+             * Updated By
+             * @description ss_user_id người sửa job này GẦN NHẤT qua PATCH /jobs/{id}. null = chưa từng bị sửa qua route có JWT.
+             */
+            updated_by?: string | null;
+            /** Parsed Content */
+            parsed_content?: {
+                [key: string]: unknown;
+            } | null;
+            /** Ss Team Notes */
+            ss_team_notes?: string | null;
+            /**
+             * Was Existing
+             * @description true = job trả về đã tồn tại từ trước (trùng công ty + tên job + level + tỉnh), request này KHÔNG tạo bản ghi mới và MỌI dữ liệu vừa gửi (lương, deadline, mô tả...) đều bị bỏ qua, không ghi đè lên job cũ. false = job vừa được tạo mới thật sự.
+             */
+            was_existing: boolean;
         };
         /**
          * JobDataHealth
@@ -3603,6 +3973,12 @@ export interface components {
          * @description Mọi field optional — chỉ gửi field muốn sửa, field không gửi giữ
          *     nguyên giá trị cũ. Dùng field job_status='CLOSED' để "xoá mềm" 1 job
          *     (xem chi tiết trong docstring db.update_job()).
+         *
+         *     XOÁ GIÁ TRỊ (thêm 09/2026): với 4 field `deadline`, `level_code`,
+         *     `province_name`, `work_type` (cột cho phép NULL), gửi RÕ `null` trong
+         *     body = xoá giá trị đó (đưa về NULL); không gửi field = giữ nguyên.
+         *     `salary_min`/`salary_max` gửi `0` hoặc `null` cũng là xoá lương. MỌI
+         *     field khác gửi `null` vẫn chỉ bị bỏ qua (không xoá được).
          */
         JobUpdate: {
             /** Job Title */
@@ -3611,14 +3987,17 @@ export interface components {
             matching_industry?: string | null;
             /**
              * Level Code
-             * @description Intern | Fresher | Junior | Middle | Senior | Lead | Manager
+             * @description Intern | Fresher | Junior | Middle | Senior | Lead | Manager — gửi null để xoá level
              */
             level_code?: string | null;
-            /** Province Name */
+            /**
+             * Province Name
+             * @description Tên tỉnh/thành hợp lệ (xem GET /enums -> province_name) — gửi null để xoá địa điểm
+             */
             province_name?: string | null;
             /**
              * Work Type
-             * @description FULL_TIME | PART_TIME | INTERNSHIP | OTHER
+             * @description FULL_TIME | PART_TIME | INTERNSHIP | OTHER — gửi null để xoá hình thức làm việc
              */
             work_type?: string | null;
             /** Currency */
@@ -3637,7 +4016,10 @@ export interface components {
              * @description MONTH | YEAR — không gửi thì giữ nguyên giá trị cũ
              */
             salary_period?: string | null;
-            /** Deadline */
+            /**
+             * Deadline
+             * @description Gửi null để xoá deadline
+             */
             deadline?: string | null;
             /**
              * Job Status
@@ -3770,6 +4152,42 @@ export interface components {
         MonthlyEngagementOut: {
             applications: components["schemas"]["MonthlyCountOut"];
             saved_jobs: components["schemas"]["MonthlyCountOut"];
+        };
+        /** MonthlyInsightsOut */
+        MonthlyInsightsOut: {
+            /**
+             * This Month Start
+             * Format: date
+             * @description Ngày đầu tháng hiện tại theo giờ VN.
+             */
+            this_month_start: string;
+            /**
+             * Last Month Start
+             * Format: date
+             */
+            last_month_start: string;
+            /** Jobs New */
+            jobs_new: number;
+            /** Jobs New Pct */
+            jobs_new_pct?: number | null;
+            /** Jobs Expired */
+            jobs_expired: number;
+            /** Companies New */
+            companies_new: number;
+            /** Companies New Pct */
+            companies_new_pct?: number | null;
+            /** Top Industries */
+            top_industries: components["schemas"]["TopIndustryRow"][];
+            /** Top Companies */
+            top_companies: components["schemas"]["TopCompanyRow"][];
+            /** Applications This Month */
+            applications_this_month: number;
+            /** Applications Pct */
+            applications_pct?: number | null;
+            /** Saved Jobs This Month */
+            saved_jobs_this_month: number;
+            /** Saved Jobs Pct */
+            saved_jobs_pct?: number | null;
         };
         /** PaginatedAuditLogs */
         PaginatedAuditLogs: {
@@ -3919,6 +4337,48 @@ export interface components {
             placeholders?: {
                 [key: string]: string;
             };
+        };
+        /** PushJobRow */
+        PushJobRow: {
+            /** Job Id */
+            job_id: string;
+            /** Job Title */
+            job_title: string;
+            /** Company Id */
+            company_id: string;
+            /** Company Name */
+            company_name: string;
+            /**
+             * Deadline
+             * Format: date
+             */
+            deadline: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Days Left
+             * @description Số ngày từ hôm nay (giờ VN) tới deadline, luôn trong khoảng 7..14.
+             */
+            days_left: number;
+        };
+        /** QuietCompanyRow */
+        QuietCompanyRow: {
+            /** Company Id */
+            company_id: string;
+            /** Company Name */
+            company_name: string;
+            /** City */
+            city?: string | null;
+            /** Quiet Days */
+            quiet_days: number;
+            /**
+             * Last Job Date
+             * Format: date
+             */
+            last_job_date: string;
         };
         /** RefreshRequest */
         RefreshRequest: {
@@ -4086,6 +4546,19 @@ export interface components {
                 [key: string]: string;
             } | null;
         };
+        /** SalaryRangeRow */
+        SalaryRangeRow: {
+            /** Industry */
+            industry: string;
+            /** Level */
+            level: string;
+            /** Avg Min */
+            avg_min?: number | null;
+            /** Avg Max */
+            avg_max?: number | null;
+            /** Sample Size */
+            sample_size: number;
+        };
         /** SavedJobCreate */
         SavedJobCreate: {
             /** Job Id */
@@ -4111,12 +4584,46 @@ export interface components {
             /** Company Name */
             company_name: string;
         };
+        /** SavedJobToggleResult */
+        SavedJobToggleResult: {
+            /** Saved */
+            saved: boolean;
+            data?: components["schemas"]["SavedJobOut"] | null;
+        };
+        /** SkillCount */
+        SkillCount: {
+            /** Skill */
+            skill: string;
+            /** Count */
+            count: number;
+        };
         /** SourceCount */
         SourceCount: {
             /** Source Name */
             source_name: string;
             /** N */
             n: number;
+        };
+        /** StaleJobRow */
+        StaleJobRow: {
+            /** Job Id */
+            job_id: string;
+            /** Job Title */
+            job_title: string;
+            /** Company Id */
+            company_id: string;
+            /** Company Name */
+            company_name: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Age Days
+             * @description Số ngày kể từ ngày thu thập (giờ VN), luôn >= 30.
+             */
+            age_days: number;
         };
         /** StatsOut */
         StatsOut: {
@@ -4141,6 +4648,17 @@ export interface components {
             /** Total Students */
             total_students: number;
         };
+        /** StudentInsightsOut */
+        StudentInsightsOut: {
+            /** Jd Needing Push */
+            jd_needing_push: components["schemas"]["PushJobRow"][];
+            /** Jd Stale */
+            jd_stale: components["schemas"]["StaleJobRow"][];
+            /** Top Skills */
+            top_skills: components["schemas"]["SkillCount"][];
+            /** Salary Ranges */
+            salary_ranges: components["schemas"]["SalaryRangeRow"][];
+        };
         /** TokenPairOut */
         TokenPairOut: {
             /** Access Token */
@@ -4157,6 +4675,27 @@ export interface components {
              * @default false
              */
             must_change_password: boolean;
+        };
+        /** TopCompanyRow */
+        TopCompanyRow: {
+            /** Company Id */
+            company_id: string;
+            /** Company Name */
+            company_name: string;
+            /** Count */
+            count: number;
+        };
+        /** TopIndustryRow */
+        TopIndustryRow: {
+            /** Industry */
+            industry: string;
+            /** Count */
+            count: number;
+            /**
+             * Pct Change
+             * @description % so với tháng trước; null nếu tháng trước = 0.
+             */
+            pct_change?: number | null;
         };
         /** UnreadCountOut */
         UnreadCountOut: {
@@ -4337,6 +4876,8 @@ export interface operations {
                 keyword?: string | null;
                 /** @description Lọc job do 1 thành viên ss_team/admin cụ thể TỰ NHẬP TAY (ss_user_id) — job crawl tự động (created_by NULL trong DB) không bao giờ khớp filter này. */
                 created_by?: string | null;
+                /** @description Lọc đúng 1 tập job_id cho trước, phân tách bởi dấu phẩy (vd 'uuid1,uuid2,uuid3') — gom N lần gọi GET /jobs/{id} riêng lẻ thành 1 lần gọi duy nhất (thêm 09/2026, vd trang 'Job đã lưu' chỉ có sẵn danh sách job_id từ GET /me/saved-jobs). KẾT HỢP được với mọi filter khác ở trên (AND chung) — vd ids=...&status=OPEN vẫn hợp lệ. */
+                ids?: string | null;
                 /** @description Mặc định false (giữ nguyên hành vi cũ, KHÔNG trả parsed_content để payload nhẹ — route này public, kể cả trang tuyển dụng công khai gọi). Truyền true khi cần đủ nội dung JD (job_description/requirements/perks/required_skills) ngay ở list, thay vì gọi riêng GET /jobs/{job_id} cho từng job — vd tab 'Tình trạng dữ liệu' (08/2026). */
                 include_content?: boolean;
                 limit?: number;
@@ -4389,7 +4930,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["JobDetailOut"];
+                    "application/json": components["schemas"]["JobCreateResult"];
                 };
             };
             /** @description Validation Error */
@@ -4419,6 +4960,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobDataHealth"];
+                };
+            };
+        };
+    };
+    get_cv_signed_url_jobs_applications__application_id__cv_url_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -4551,6 +5123,78 @@ export interface operations {
             };
         };
     };
+    get_student_insights_dashboard_insights_students_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentInsightsOut"];
+                };
+            };
+        };
+    };
+    get_company_insights_dashboard_insights_companies_get: {
+        parameters: {
+            query?: {
+                /** @description Ngưỡng số ngày im lặng cho contacts_needing_followup — chỉ nhận 7 | 14 | 30 (mặc định 14), giá trị khác trả 400. */
+                followup_days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyInsightsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_monthly_insights_dashboard_insights_monthly_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonthlyInsightsOut"];
+                };
+            };
+        };
+    };
     list_companies_companies_get: {
         parameters: {
             query?: {
@@ -4612,7 +5256,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CompanyOut"];
+                    "application/json": components["schemas"]["CompanyCreateResult"];
                 };
             };
             /** @description Validation Error */
@@ -4964,7 +5608,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContactDeleteRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             204: {
@@ -5984,37 +6632,6 @@ export interface operations {
             };
         };
     };
-    get_cv_signed_url_me_applications__application_id__cv_url_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                application_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     withdraw_application_me_applications__job_id__delete: {
         parameters: {
             query?: {
@@ -6087,6 +6704,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SavedJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    toggle_saved_job_me_saved_jobs_toggle_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedJobCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedJobToggleResult"];
                 };
             };
             /** @description Validation Error */
@@ -6733,6 +7383,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConversationOut"][];
+                };
+            };
+        };
+    };
+    get_conversation_messages_conversations__partner_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                partner_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
