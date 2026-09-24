@@ -17,6 +17,9 @@ import {
 export type JobOut = components["schemas"]["JobOut"];
 export type JobDetailOut = components["schemas"]["JobDetailOut"];
 export type PaginatedJobs = components["schemas"]["PaginatedJobs"];
+export type JobCreate = components["schemas"]["JobCreate"];
+export type JobUpdate = components["schemas"]["JobUpdate"];
+export type JobCreateResult = components["schemas"]["JobCreateResult"];
 
 export interface JobFilters {
   q?: string;
@@ -206,6 +209,38 @@ export function toJobDetailData(job: JobDetailOut): JobDetailData {
     skills: parsed.required_skills ?? [],
     note: job.ss_team_notes || "",
   };
+}
+
+// ---------------------------------------------------------------------------
+// Nhóm 1, phần 3b — <JobForm> (tạo/sửa job thủ công). company_id BẮT BUỘC
+// và CHỈ có ở JobCreate (POST /jobs) — PATCH /jobs/{id} (JobUpdate) KHÔNG
+// có field này, khớp đúng quy tắc "ô chọn công ty chỉ hiện ở form tạo mới"
+// đã nêu trong plan (không có API nào đổi company của job đã tồn tại).
+
+/** POST /jobs — tạo job thủ công. company_id phải đã tồn tại trong DB
+ *  (nơi gọi tự resolve qua CompanyCombobox: chọn công ty có sẵn, hoặc
+ *  gọi createCompany() trước rồi lấy company_id trả về — xem
+ *  lib/actions/job-actions.ts::createJobAction()). IDEMPOTENT theo
+ *  company_id + job_title + level_code + province_name — was_existing
+ *  trong response báo job trả về là job CŨ nếu trùng, nơi gọi phải tự
+ *  hiện rõ cho staff, không coi 201 là luôn "vừa tạo mới". */
+export async function createJob(data: JobCreate): Promise<JobCreateResult> {
+  return callAuthed<JobCreateResult>("/jobs", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+/** PATCH /jobs/{id} — sửa TỰ DO các field của job đã tồn tại (dùng cho
+ *  <JobForm mode="edit">, KHÁC updateJobStatus() bên dưới — hàm đó chỉ
+ *  đổi job_status). parsed_content: gửi field này sẽ GHI ĐÈ TOÀN BỘ,
+ *  không merge từng key con — nơi gọi (updateJobAction) luôn gửi đủ 4
+ *  key con lấy từ state hiện tại của form, không gửi thiếu. */
+export async function updateJob(jobId: string, data: JobUpdate): Promise<JobDetailOut> {
+  return callAuthed<JobDetailOut>(`/jobs/${jobId}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
 }
 
 /** PATCH /jobs/{id} chỉ với job_status (+ note audit log tuỳ chọn) —
