@@ -14,11 +14,16 @@
 
 import { useRef, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { INDUSTRIES, JOB_LOCATIONS, JOB_STATUS_LABELS } from "@/lib/constants";
+import { INDUSTRIES, JOB_STATUS_LABELS } from "@/lib/constants";
+import { withCurrentOption } from "@/lib/utils";
 
 const DEBOUNCE_MS = 300;
 
-export function JobFilterBar({ levels }: { levels: string[] }) {
+// `provinces` lấy từ GET /enums (lib/api/enums.ts::getProvinceNames) — backend
+// lọc `province` khớp TUYỆT ĐỐI với tên trong bảng provinces, nên dropdown
+// chỉ được chứa đúng tên backend biết (trước đây có "TP.HCM"/"Hybrid" tự
+// đặt -> luôn ra 0 job).
+export function JobFilterBar({ levels, provinces }: { levels: string[]; provinces: string[] }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -98,7 +103,9 @@ export function JobFilterBar({ levels }: { levels: string[] }) {
         className="rounded-md border px-3 py-2 text-sm"
       >
         <option value="">Mọi địa điểm</option>
-        {JOB_LOCATIONS.map((loc) => (
+        {/* URL cũ/bookmark có location không còn hợp lệ vẫn hiện được ở đây
+            thay vì <select> lặng lẽ hiện "Mọi địa điểm" trong khi vẫn đang lọc. */}
+        {withCurrentOption(provinces, location).map((loc) => (
           <option key={loc} value={loc}>
             {loc}
           </option>

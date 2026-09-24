@@ -11,7 +11,7 @@
 
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/session";
-import { getLevelCodes } from "@/lib/api/enums";
+import { getLevelCodes, getProvinceNames } from "@/lib/api/enums";
 import { listJobs, toJobCardData } from "@/lib/api/jobs";
 import { listMySavedJobIds } from "@/lib/api/applications";
 import { INDUSTRIES, JOBS_PER_PAGE, INDUSTRY_BADGE_STYLES, INDUSTRY_BADGE_FALLBACK } from "@/lib/constants";
@@ -48,7 +48,11 @@ export default async function JobsPage({
     status: params.status ?? "",
   };
 
-  const [user, levels] = await Promise.all([getCurrentUser(), getLevelCodes()]);
+  const [user, levels, provinces] = await Promise.all([
+    getCurrentUser(),
+    getLevelCodes(),
+    getProvinceNames(),
+  ]);
 
   let page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
   let offset = (page - 1) * JOBS_PER_PAGE;
@@ -106,7 +110,7 @@ export default async function JobsPage({
         )}
       </header>
 
-      <JobFilterBar levels={levels} />
+      <JobFilterBar levels={levels} provinces={provinces} />
 
       <p className="text-sm text-muted-foreground">
         {jobs.length > 0

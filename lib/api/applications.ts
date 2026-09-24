@@ -7,11 +7,11 @@
 
 import { callAuthed } from "./client";
 import type { components } from "./types";
-import type { SavedJobToggleResult } from "./types-manual";
 
 export type JobApplicantOut = components["schemas"]["JobApplicantOut"];
 export type JobSaverOut = components["schemas"]["JobSaverOut"];
 export type SavedJobOut = components["schemas"]["SavedJobOut"];
+export type SavedJobToggleResult = components["schemas"]["SavedJobToggleResult"];
 
 /**
  * GET /jobs/{job_id}/applications — staff xem học viên đã ứng tuyển job
@@ -54,10 +54,8 @@ export async function listMySavedJobIds(): Promise<Set<string>> {
  * làm đúng việc "dàn xếp" đó ở phía backend, Next.js không cần replicate
  * logic bắt-409-rồi-gọi-tiếp ở đây nữa.
  *
- * response_model dùng type viết tay (SavedJobToggleResult, xem
- * types-manual.ts) vì lib/api/types.ts hiện tại generate TRƯỚC khi
- * route này tồn tại ở backend — xoá type tạm + đổi import khi generate
- * lại types.ts.
+ * Kiểu trả về SavedJobToggleResult lấy thẳng từ types.ts (đã generate
+ * lại sau khi backend có route này) — không còn type viết tay.
  */
 export async function toggleSavedJob(jobId: string): Promise<SavedJobToggleResult> {
   return callAuthed<SavedJobToggleResult>("/me/saved-jobs/toggle", {

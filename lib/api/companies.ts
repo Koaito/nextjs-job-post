@@ -9,6 +9,7 @@ import type { components } from "./types";
 
 export type CompanyOut = components["schemas"]["CompanyOut"];
 export type CompanyCreate = components["schemas"]["CompanyCreate"];
+export type CompanyCreateResult = components["schemas"]["CompanyCreateResult"];
 export type PaginatedCompanies = components["schemas"]["PaginatedCompanies"];
 
 export interface CompanyOption {
@@ -67,53 +68,35 @@ export interface CreateCompanyInput {
 }
 
 /**
- * Kết quả tạo công ty, kèm `wasExisting` — LƯU Ý: field này là suy
- * đoán ở tầng FE, KHÔNG phải dữ liệu backend trả về thật. Backend
- * hiện tại (POST /companies) KHÔNG trả field nào báo hiệu "đây là
- * công ty vừa tạo mới hay là công ty cũ được vá thêm thông tin" — xem
- * lib/api/types.ts::CompanyCreate/CompanyOut, không có `was_existing`.
- * Plan (Phần 5 mục 16) có đề xuất backend bổ sung field này nhưng ghi
- * rõ "Không chặn go-live — thiếu field này Next.js vẫn hoạt động
- * đúng, chỉ là thông báo kém chính xác hơn mức có thể".
+ * Kết quả tạo công ty, kèm `wasExisting` lấy THẲNG từ backend
+ * (POST /companies trả CompanyCreateResult.was_existing — Phần 5 mục 16
+ * của plan, Scrap_JD đã làm). true = công ty trả về đã có từ trước
+ * (trùng tax_id hoặc tên), request này chỉ vá thêm thông tin, KHÔNG tạo
+ * bản ghi mới -> nơi gọi (nhánh "＋ Tạo công ty mới…" của JobForm, tab
+ * Công ty ở /them-moi) phải báo rõ cho staff thay vì nói "đã tạo".
  *
- * Vì vậy hàm này chỉ đoán `wasExisting: true` bằng 1 tín hiệu gián
- * tiếp DUY NHẤT đáng tin: tax_id gõ vào có khớp với 1 company ĐÃ CÓ
- * SẴN trong danh sách công ty đã tải (companies truyền vào, cùng
- * nguồn listAllCompanies() dùng cho CompanyCombobox) TRƯỚC KHI gọi
- * tạo. Không đoán được theo TÊN trùng (backend so khớp tên "không
- * phân biệt hoa/thường, khớp y hệt" — làm lại đúng luật so khớp đó ở
- * FE là trùng lặp logic dễ lệch, trong khi tax_id so khớp tuyệt đối
- * đơn giản và an toàn hơn). Nếu tax_id để trống hoặc không khớp company
- * nào đã biết, `wasExisting` trả về `undefined` — nghĩa là "không rõ",
- * KHÔNG mặc định là `false`, để nơi gọi hiện đúng thông báo trung lập
- * thay vì khẳng định nhầm "đã tạo mới" trong lúc thực ra có thể đã
- * trùng theo TÊN (trường hợp FE không đoán được).
+ * Trước đây hàm này phải đoán theo tax_id trong danh sách công ty đã tải
+ * (không đoán được theo tên) vì backend chưa có field này — đã bỏ, và
+ * `wasExisting` giờ luôn là boolean thật (không còn trạng thái "không
+ * rõ" = undefined).
  */
 export interface CreateCompanyResult {
   company: CompanyOption;
-  wasExisting: boolean | undefined;
+  wasExisting: boolean;
 }
 
-export async function createCompany(
-  input: CreateCompanyInput,
-  knownCompanies: CompanyOption[],
-): Promise<CreateCompanyResult> {
-  const taxId = input.taxId?.trim() || undefined;
+export async function createCompany(input: CreateCompanyInput): Promise<CreateCompanyResult> {
   const payload: CompanyCreate = {
     company_name: input.companyName.trim(),
-    tax_id: taxId ?? null,
+    tax_id: input.taxId?.trim() || null,
     website: input.website?.trim() || null,
     industry: input.industry?.trim() || null,
     province_name: input.city?.trim() || null,
   };
-  const raw = await callAuthed<CompanyOut>("/companies", {
+  const raw = await callAuthed<CompanyCreateResult>("/companies", {
     method: "POST",
     body: JSON.stringify(payload),
   });
 
-  const wasExisting = taxId
-    ? knownCompanies.some((c) => c.taxId && c.taxId === taxId)
-    : undefined;
-
-  return { company: toCompanyOption(raw), wasExisting };
+  return { company: toCompanyOption(raw), wasExisting: raw.was_existing };
 }

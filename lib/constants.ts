@@ -23,7 +23,7 @@ export const TRACK_OTHER = "Khác / Chưa xác định";
 // tự "sửa cho đúng" theo địa giới hành chính hiện tại, tránh gửi lên
 // giá trị mà dữ liệu cũ trong DB không có). Dùng cho field "Thành phố"
 // của company (CompanyCombobox mục tạo mới, CompanyForm ở Nhóm 2) —
-// KHÁC hẳn JOB_LOCATIONS (4 giá trị, dropdown filter job) ở dưới.
+// KHÁC hẳn danh sách tỉnh của JOB (lib/api/enums.ts::getProvinceNames).
 export const CITIES_VN = [
   "Hà Nội", "TP. Hồ Chí Minh", "Đà Nẵng", "Cần Thơ", "Hải Phòng",
   "An Giang", "Bà Rịa - Vũng Tàu", "Bắc Giang", "Bắc Kạn", "Bạc Liêu",
@@ -58,12 +58,11 @@ export const ROLE_LABELS: Record<string, string> = {
 // tay ở đây, level đã từng bị lệch kiểu này trước khi Flask đổi sang
 // gọi GET /enums, 08/2026).
 
-// LOCATIONS (dropdown filter job) CHỦ Ý chỉ có 4 giá trị, KHÁC hẳn
-// CITIES_VN (63 tỉnh thành, dùng cho field "Thành phố" của company,
-// Nhóm 2) — 2 danh sách phục vụ 2 mục đích khác nhau, backend chỉ
-// filter province_name theo kiểu chứa chuỗi (ILIKE), không phải enum
-// chặt, nên không cần đồng bộ 2 danh sách này với nhau.
-export const JOB_LOCATIONS = ["Hà Nội", "TP.HCM", "Remote", "Hybrid"] as const;
+// Dropdown địa điểm của filter /jobs KHÔNG còn hardcode ở đây: GET /jobs
+// lọc `province` khớp TUYỆT ĐỐI với tên trong bảng provinces (không phải
+// ILIKE), nên danh sách cũ 4 giá trị ("TP.HCM", "Hybrid"...) gần như luôn
+// ra 0 job. Danh sách thật lấy từ GET /enums — lib/api/enums.ts::
+// getProvinceNames() (plan Phần 1 mục 3.4).
 
 // job_status: chỉ 2 giá trị thật ở backend (OPEN/CLOSED) — filter mặc
 // định "Đang tuyển" khi không truyền status (xem lib/api/jobs.ts,

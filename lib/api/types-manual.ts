@@ -31,20 +31,3 @@ export type BackendUser = components["schemas"]["UserOut"] & {
  *  từ getMe() ngay sau đó, vì có thể lệch nếu admin đổi cờ này giữa lúc
  *  access token cũ còn hiệu lực). */
 export type TokenPair = components["schemas"]["TokenPairOut"];
-
-/**
- * TẠM THỜI viết tay — `POST /me/saved-jobs/toggle` (Scrap_JD commit
- * fd66308, "Phần 5 mục 9 của plan") chưa có mặt trong lib/api/types.ts
- * vì file đó được generate TRƯỚC khi backend thêm route này. Route
- * thật đã tồn tại và đã chạy được (đọc trực tiếp api/routers/me.py xác
- * nhận), chỉ là generated types chưa theo kịp.
- *
- * XOÁ đoạn này (và đổi lib/api/applications.ts sang import thẳng từ
- * "./types") ngay khi types.ts được generate lại có route này — không
- * cần sửa logic gì ở nơi gọi, chỉ đổi nguồn import.
- */
-export interface SavedJobToggleResult {
-  saved: boolean;
-  /** null khi saved=false (vừa bỏ lưu) — có giá trị khi saved=true (vừa lưu). */
-  data: components["schemas"]["SavedJobOut"] | null;
-}
