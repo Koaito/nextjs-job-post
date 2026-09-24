@@ -10,19 +10,22 @@
 // sách khi bỏ lưu), để dành cho trang "Job đã lưu" — thuộc Nhóm 5, CHƯA
 // làm ở đây, không thêm code cho case chưa cần.
 //
-// useOptimistic (không phải useState) đúng theo plan: save/unsave job
-// là thao tác nhỏ, làm đi làm lại nhiều lần, không bắt buộc lý do — cập
-// nhật UI ngay khi bấm, gọi server action ở nền, rollback nếu lỗi.
+// Trạng thái "đã lưu" KHÔNG còn là prop `initialSaved` từng nơi tự fetch
+// — đọc từ <SavedJobsProvider> ở app/(app)/layout.tsx (Round 5, plan
+// Phần 2 mục 5). Cập nhật LẠC QUAN: đổi state trong Provider ngay khi
+// bấm (mọi nơi hiện cùng job này đổi theo), gọi server action ở nền, đổi
+// ngược lại + toast lỗi nếu action thất bại.
 
-import { useOptimistic, useState, useTransition } from "react";
+import { useTransition } from "react";
 import { Bookmark, BookmarkCheck } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "cn";
+import { useSavedJobs } from "@/components/saved-jobs-provider";
 import { toggleSaveJobAction } from "@/lib/actions/job-actions";
 
 interface SaveJobButtonProps {
   jobId: string;
-  initialSaved: boolean;
   variant?: "card" | "detail";
   /** Staff KHÔNG được lưu job (job_detail.html chỉ hiện aside Lưu/Ứng
    *  tuyển cho học viên) — nơi gọi tự quyết định ẩn hẳn component này ở
@@ -35,49 +38,45 @@ interface SaveJobButtonProps {
 
 export function SaveJobButton({
   jobId,
-  initialSaved,
   variant = "card",
   disabledReason,
 }: SaveJobButtonProps) {
+  const { isSaved, setSaved } = useSavedJobs();
   const [isPending, startTransition] = useTransition();
-  const [optimisticSaved, setOptimisticSaved] = useOptimistic(initialSaved);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const saved = isSaved(jobId);
 
   function handleClick() {
-    setErrorMessage(null);
+    const previous = saved;
+    setSaved(jobId, !previous); // lạc quan: đổi UI ngay, chưa đợi server
     startTransition(async () => {
-      setOptimisticSaved(!optimisticSaved);
       const result = await toggleSaveJobAction(jobId);
       if (!result.ok) {
-        // useOptimistic tự rollback về giá trị thật (initialSaved) khi
-        // startTransition kết thúc mà không có update mới nào further —
-        // hiện thêm message lỗi để người dùng biết vì sao icon nhảy lại.
-        setErrorMessage(result.errorMessage ?? "Không thể lưu job lúc này.");
+        setSaved(jobId, previous); // rollback về giá trị trước khi bấm
+        toast.error(result.errorMessage ?? "Không thể lưu job lúc này.");
+        return;
       }
+      // Server là nguồn sự thật: nếu trạng thái thật khác dự đoán lạc quan
+      // (vd job đã được lưu/bỏ lưu từ tab khác), lấy theo server.
+      if (typeof result.saved === "boolean") setSaved(jobId, result.saved);
     });
   }
 
-  const label = optimisticSaved ? "Đã lưu" : "Lưu job";
-  const Icon = optimisticSaved ? BookmarkCheck : Bookmark;
+  const label = saved ? "Đã lưu" : "Lưu job";
+  const Icon = saved ? BookmarkCheck : Bookmark;
 
   if (variant === "detail") {
     return (
-      <div>
-        <Button
-          type="button"
-          variant={optimisticSaved ? "secondary" : "default"}
-          className="w-full"
-          disabled={isPending}
-          onClick={handleClick}
-          title={disabledReason}
-        >
-          <Icon className="size-4" />
-          {label}
-        </Button>
-        {errorMessage && (
-          <p className="mt-1.5 text-xs text-destructive">{errorMessage}</p>
-        )}
-      </div>
+      <Button
+        type="button"
+        variant={saved ? "secondary" : "default"}
+        className="w-full"
+        disabled={isPending}
+        onClick={handleClick}
+        title={disabledReason}
+      >
+        <Icon className="size-4" />
+        {label}
+      </Button>
     );
   }
 
@@ -90,9 +89,9 @@ export function SaveJobButton({
       size="icon-sm"
       disabled={isPending}
       onClick={handleClick}
-      title={errorMessage ?? disabledReason ?? label}
+      title={disabledReason ?? label}
       aria-label={label}
-      className={cn(optimisticSaved && "text-primary")}
+      className={cn(saved && "text-primary")}
     >
       <Icon className="size-4" />
     </Button>

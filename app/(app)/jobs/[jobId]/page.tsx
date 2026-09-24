@@ -13,7 +13,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
 import { getJob, toJobDetailData } from "@/lib/api/jobs";
-import { listJobApplicants, listJobSavers, listMySavedJobIds } from "@/lib/api/applications";
+import { listJobApplicants, listJobSavers } from "@/lib/api/applications";
 import { JobStatusPanel } from "./job-status-panel";
 import { ApplySection } from "./apply-section";
 
@@ -54,13 +54,14 @@ export default async function JobDetailPage({
   const isAuthenticated = !!user;
 
   // 2 lời gọi phụ CHỈ chạy đúng ngữ cảnh cần (khớp job_detail() bên
-  // Flask — applicants/savers chỉ gọi cho staff, saved-jobs chỉ có ý
-  // nghĩa cho học viên đã đăng nhập). is_duplicate_candidate KHÔNG có
-  // ở đây nữa — xem comment ở lib/api/jobs.ts giải thích lý do bỏ.
-  const [applicants, savers, savedJobIds] = await Promise.all([
+  // Flask — applicants/savers chỉ gọi cho staff). Trạng thái "đã lưu"
+  // của học viên KHÔNG fetch ở đây nữa: <SaveJobButton> đọc từ
+  // SavedJobsProvider (app/(app)/layout.tsx, Round 5). is_duplicate_
+  // candidate KHÔNG có ở đây nữa — xem comment ở lib/api/jobs.ts giải
+  // thích lý do bỏ.
+  const [applicants, savers] = await Promise.all([
     isStaff ? listJobApplicants(jobId).catch(() => []) : Promise.resolve(null),
     isStaff ? listJobSavers(jobId).catch(() => []) : Promise.resolve(null),
-    isAuthenticated && !isStaff ? listMySavedJobIds().catch(() => new Set<string>()) : Promise.resolve(new Set<string>()),
   ]);
 
   return (
@@ -195,11 +196,7 @@ export default async function JobDetailPage({
               </section>
             </>
           ) : (
-            <ApplySection
-              jobId={job.id}
-              isAuthenticated={isAuthenticated}
-              initialSaved={savedJobIds.has(job.id)}
-            />
+            <ApplySection jobId={job.id} isAuthenticated={isAuthenticated} />
           )}
 
           <section className="rounded-md border p-4">

@@ -24,11 +24,9 @@ import { Button, buttonVariants } from "@/components/ui/button";
 export function ApplySection({
   jobId,
   isAuthenticated,
-  initialSaved,
 }: {
   jobId: string;
   isAuthenticated: boolean;
-  initialSaved: boolean;
 }) {
   // Đường quay lại sau khi đăng nhập. /login đã tự lọc `next` qua
   // safeInternalPath() (login/page.tsx), path này cũng luôn là path nội
@@ -59,7 +57,7 @@ export function ApplySection({
       <p className="text-xs text-muted-foreground">
         Nộp CV trực tiếp trên trang này sẽ có ở bản cập nhật sau.
       </p>
-      <SaveJobButton jobId={jobId} initialSaved={initialSaved} variant="detail" />
+      <SaveJobButton jobId={jobId} variant="detail" />
     </section>
   );
 }

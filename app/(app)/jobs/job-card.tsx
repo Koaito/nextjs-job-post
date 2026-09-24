@@ -4,6 +4,8 @@
 // khớp đúng _job_card.html gốc (backend tự chặn + trả lỗi tại chỗ nếu
 // staff bấm, không phải Next.js tự ẩn nút ở biến thể "card" — khác
 // biến thể "detail" ở trang chi tiết, nơi staff không thấy aside này).
+// Trạng thái "đã lưu" do <SaveJobButton> tự đọc từ SavedJobsProvider
+// (app/(app)/layout.tsx, Round 5) — card không nhận prop trạng thái lưu.
 //
 // Không hiện skill-tag: GET /jobs mặc định KHÔNG trả parsed_content
 // (include_content=false, xem lib/api/jobs.ts) nên "skills" luôn rỗng
@@ -27,15 +29,11 @@ function formatDeadline(iso: string | null): string | null {
 export function JobCard({
   job,
   isAuthenticated,
-  isSaved,
 }: {
   job: JobCardData;
   /** Chưa đăng nhập -> không hiện nút Lưu job (khớp _job_card.html:
    *  action "Lưu job" chỉ hiện khi current_user đã đăng nhập). */
   isAuthenticated: boolean;
-  /** Trạng thái đã lưu ban đầu (SSR, từ listMySavedJobIds() ở
-   *  page.tsx) — mặc định false khi không đăng nhập/không truyền. */
-  isSaved?: boolean;
 }) {
   const industryStyle = INDUSTRY_BADGE_STYLES[job.industry] ?? INDUSTRY_BADGE_FALLBACK;
   const deadline = formatDeadline(job.deadline);
@@ -84,7 +82,7 @@ export function JobCard({
             {job.statusLabel}
           </span>
           {isAuthenticated && (
-            <SaveJobButton jobId={job.id} initialSaved={!!isSaved} variant="card" />
+            <SaveJobButton jobId={job.id} variant="card" />
           )}
         </div>
       </div>

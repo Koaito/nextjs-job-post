@@ -19,22 +19,23 @@ export interface ToggleSaveJobResult {
 }
 
 /**
- * Dùng cho <SaveJobButton> (useOptimistic) — gọi POST /me/saved-jobs/toggle
+ * Dùng cho <SaveJobButton> (cập nhật lạc quan qua SavedJobsProvider) —
+ * gọi POST /me/saved-jobs/toggle
  * (route mới, xem lib/api/applications.ts::toggleSavedJob) trong ĐÚNG 1
  * lần gọi cho mỗi lần bấm nút, không tự bắt 409 rồi gọi tiếp DELETE như
  * cách cũ plan mô tả ban đầu.
  *
- * revalidatePath cả 2 nơi job này có thể đang hiển thị icon "đã lưu"
- * (trang danh sách + trang chi tiết) — dù useOptimistic đã cập nhật UI
- * ngay lập tức phía component gọi action này, revalidatePath vẫn cần
- * để lần load trang KẾ TIẾP (SSR, không phải optimistic) phản ánh đúng
- * trạng thái mới, không riêng gì job vừa bấm ở component hiện tại.
+ * KHÔNG revalidatePath ở đây (Round 5): trạng thái "đã lưu" giờ nằm ở
+ * <SavedJobsProvider> (app/(app)/layout.tsx) và <SaveJobButton> tự cập
+ * nhật Provider ngay khi bấm — không trang nào còn đọc trạng thái này
+ * từ dữ liệu SSR riêng của nó. revalidatePath trong Server Action còn
+ * khiến Next render lại cả trang + layout sau MỖI lần bấm (thêm 2 lượt
+ * gọi backend: /auth/me + /me/saved-jobs) mà không thay đổi gì trên màn
+ * hình. Khi làm trang "Job đã lưu" (Nhóm 5), trang đó tự lo việc của nó.
  */
 export async function toggleSaveJobAction(jobId: string): Promise<ToggleSaveJobResult> {
   try {
     const result = await toggleSavedJob(jobId);
-    revalidatePath("/jobs");
-    revalidatePath(`/jobs/${jobId}`);
     return { ok: true, saved: result.saved };
   } catch (err) {
     const message =
