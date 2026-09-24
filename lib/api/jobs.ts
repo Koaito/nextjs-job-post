@@ -5,7 +5,7 @@
 // GET /jobs là route PUBLIC (chỉ cần X-API-Key, không cần đăng nhập) —
 // dùng callPublic(), KHÔNG dùng callAuthed() (xem lib/api/client.ts).
 
-import { callPublic } from "./client";
+import { callAuthed, callPublic } from "./client";
 import type { components } from "./types";
 import {
   JOB_STATUS_LABELS,
@@ -15,6 +15,7 @@ import {
 } from "@/lib/constants";
 
 export type JobOut = components["schemas"]["JobOut"];
+export type JobDetailOut = components["schemas"]["JobDetailOut"];
 export type PaginatedJobs = components["schemas"]["PaginatedJobs"];
 
 export interface JobFilters {
@@ -101,7 +102,15 @@ export interface JobCardData {
  *     phải dấu chấm kiểu `toLocaleString("vi-VN")`) để không đổi cách
  *     hiển thị con số so với bản Flask hiện tại — thay đổi cách hiển
  *     thị không nằm trong phạm vi round này. */
-function formatSalary(job: JobOut): string {
+interface SalaryFields {
+  salary_min?: number | null;
+  salary_max?: number | null;
+  salary_type?: string | null;
+  salary_period?: string | null;
+  currency?: string | null;
+}
+
+function formatSalary(job: SalaryFields): string {
   const { salary_min, salary_max } = job;
   const currency = job.currency || "VNĐ";
   const salaryTypeLabel = SALARY_TYPE_LABELS[job.salary_type || ""] || job.salary_type || "";
@@ -118,6 +127,115 @@ function formatSalary(job: JobOut): string {
 
   return `${amount} ${currency}${periodSuffix} (${salaryTypeLabel})`.trim();
 }
+
+// ---------------------------------------------------------------------------
+// Nhóm 1, phần 2 — job_detail.html -> app/(app)/jobs/[jobId]/page.tsx.
+// GET /jobs/{id} trả JobDetailOut (KHÁC JobOut của GET /jobs list) — LUÔN
+// kèm parsed_content/ss_team_notes đầy đủ, không có tham số include_content
+// nào ở đây (khác list, xem comment ở lib/api/jobs.ts phần trên) vì đây là
+// đúng 1 job nên trả full ngay, không cần tiết kiệm payload như list.
+// -----------------------------------------------------------------------
+
+export async function getJob(jobId: string): Promise<JobDetailOut | null> {
+  try {
+    return await callPublic<JobDetailOut>(`/jobs/${jobId}`);
+  } catch {
+    // Khớp db_data.get_job() bên Flask: job không tồn tại -> None, để
+    // page.tsx tự quyết định notFound() thay vì để lỗi mạng chung chung
+    // (404 thật) lẫn với "job không tồn tại" (cũng thường là 404 từ
+    // backend) — cả 2 đều rơi vào nhánh này, khớp hành vi Flask hiện tại
+    // (job_id sai định dạng UUID hay không tồn tại đều render 404).
+    return null;
+  }
+}
+
+export interface JobDetailData {
+  id: string;
+  position: string;
+  company: string;
+  companyId: string;
+  industry: string;
+  level: string;
+  location: string;
+  workType: string;
+  statusLabel: string;
+  statusRaw: string;
+  salaryDisplay: string;
+  deadline: string | null;
+  source: string;
+  jdLink: string;
+  dateCollected: string | null;
+  description: string;
+  requirements: string;
+  benefits: string;
+  skills: string[];
+  note: string;
+}
+
+/** Khớp _normalize_job() bên Flask phần đọc parsed_content — 4 key con
+ *  (job_description/requirements/perks/required_skills), mọi key đều
+ *  optional/có thể null, không đọc thẳng job.parsed_content.xxx mà
+ *  không qua fallback rỗng (job nhập tay cũ có thể parsed_content = null
+ *  hoàn toàn, không chỉ thiếu từng key con). */
+export function toJobDetailData(job: JobDetailOut): JobDetailData {
+  const parsed = (job.parsed_content ?? {}) as {
+    job_description?: string | null;
+    requirements?: string | null;
+    perks?: string | null;
+    required_skills?: string[] | null;
+  };
+  return {
+    id: job.job_id,
+    position: job.job_title,
+    company: job.company_name,
+    companyId: job.company_id,
+    industry: job.matching_industry || "",
+    level: job.level_code || "",
+    location: job.province_name || "",
+    workType: WORK_TYPE_LABELS[job.work_type || ""] || job.work_type || "",
+    statusLabel: JOB_STATUS_LABELS[job.job_status || ""] || job.job_status || "",
+    statusRaw: job.job_status || "OPEN",
+    salaryDisplay: formatSalary(job),
+    deadline: job.deadline ?? null,
+    source: job.source_name || "",
+    jdLink: job.source_url || "",
+    dateCollected: job.created_at ?? null,
+    description: parsed.job_description || "",
+    requirements: parsed.requirements || "",
+    benefits: parsed.perks || "",
+    skills: parsed.required_skills ?? [],
+    note: job.ss_team_notes || "",
+  };
+}
+
+/** PATCH /jobs/{id} chỉ với job_status (+ note audit log tuỳ chọn) —
+ *  dùng CHUNG cho cả 2 nút "Cập nhật trạng thái" (mọi status) và
+ *  "Đóng job" (status=CLOSED cố định) ở job_detail.html, đúng
+ *  update_job_status() bên Flask. note KHÔNG bắt buộc (khớp
+ *  jobStatusModal/jobDeleteModal — khác hẳn note bắt buộc ở Nhóm 2). */
+export async function updateJobStatus(
+  jobId: string,
+  status: "OPEN" | "CLOSED",
+  note?: string,
+): Promise<JobDetailOut> {
+  return callAuthed<JobDetailOut>(`/jobs/${jobId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ job_status: status, note: note?.trim() || null }),
+  });
+}
+
+/** ĐÃ BỎ: is_duplicate_candidate (aside "Trùng lặp?" ở job_detail.html).
+ *  Lý do: bản Flask gọi thẳng db_data.is_duplicate_candidate(job) — 1
+ *  hàm query trực tiếp DB, không qua REST API. Backend FastAPI mới
+ *  KHÔNG có field này trên JobDetailOut (xem lib/api/types.ts) — cơ
+ *  chế phát hiện trùng ở backend mới nằm ở `duplicate_job_groups`
+ *  (dạng bulk, không phải "true/false cho 1 job", nhiều khả năng
+ *  thuộc phần trạng thái dữ liệu ở Nhóm 6). Round trước có viết 1 bản
+ *  tự chế gọi listJobs({q: company}) rồi so sánh thủ công để giả lập
+ *  — đây là suy đoán không khớp cách backend mới hoạt động, tốn thêm
+ *  1 API call mỗi lần load trang mà không nằm trong phạm vi plan chỉ
+ *  định cho Nhóm 1, nên bỏ hẳn thay vì giữ lại 1 bản đoán sai. Nếu
+ *  Nhóm 6 xác nhận có endpoint tương đương, làm lại đúng chỗ đó. */
 
 export function toJobCardData(job: JobOut): JobCardData {
   return {
