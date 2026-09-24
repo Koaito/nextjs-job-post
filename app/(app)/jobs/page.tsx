@@ -102,7 +102,7 @@ export default async function JobsPage({
         </div>
         {user?.is_staff && (
           <Link
-            href="/jobs/add"
+            href="/them-moi?tab=job"
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
           >
             ＋ Thêm job mới
@@ -167,7 +167,7 @@ export default async function JobsPage({
           <p className="mb-4 text-muted-foreground">Chưa có job nào khớp bộ lọc.</p>
           {user?.is_staff && (
             <Link
-              href="/jobs/add"
+              href="/them-moi?tab=job"
               className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
             >
               Thêm job đầu tiên
