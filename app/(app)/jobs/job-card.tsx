@@ -1,7 +1,9 @@
 // app/(app)/jobs/job-card.tsx
-// Tương đương _job_card.html (Flask, class .ticket). Server Component
-// thuần — chưa có nút "Lưu job" (<SaveJobButton>, useOptimistic) ở
-// round này, xem checklist Nhóm 1 mục kế tiếp.
+// Tương đương _job_card.html (Flask, class .ticket). Có nút "Lưu job"
+// (<SaveJobButton variant="card">) — hiện cho MỌI role kể cả staff,
+// khớp đúng _job_card.html gốc (backend tự chặn + trả lỗi tại chỗ nếu
+// staff bấm, không phải Next.js tự ẩn nút ở biến thể "card" — khác
+// biến thể "detail" ở trang chi tiết, nơi staff không thấy aside này).
 //
 // Không hiện skill-tag: GET /jobs mặc định KHÔNG trả parsed_content
 // (include_content=false, xem lib/api/jobs.ts) nên "skills" luôn rỗng
@@ -13,6 +15,7 @@
 import Link from "next/link";
 import { INDUSTRY_BADGE_STYLES, INDUSTRY_BADGE_FALLBACK } from "@/lib/constants";
 import type { JobCardData } from "@/lib/api/jobs";
+import { SaveJobButton } from "@/components/save-job-button";
 
 function formatDeadline(iso: string | null): string | null {
   if (!iso) return null;
@@ -21,7 +24,19 @@ function formatDeadline(iso: string | null): string | null {
   return d.toLocaleDateString("vi-VN");
 }
 
-export function JobCard({ job }: { job: JobCardData }) {
+export function JobCard({
+  job,
+  isAuthenticated,
+  isSaved,
+}: {
+  job: JobCardData;
+  /** Chưa đăng nhập -> không hiện nút Lưu job (khớp _job_card.html:
+   *  action "Lưu job" chỉ hiện khi current_user đã đăng nhập). */
+  isAuthenticated: boolean;
+  /** Trạng thái đã lưu ban đầu (SSR, từ listMySavedJobIds() ở
+   *  page.tsx) — mặc định false khi không đăng nhập/không truyền. */
+  isSaved?: boolean;
+}) {
   const industryStyle = INDUSTRY_BADGE_STYLES[job.industry] ?? INDUSTRY_BADGE_FALLBACK;
   const deadline = formatDeadline(job.deadline);
   // Khớp ĐÚNG _job_card.html: 2 điều kiện tách biệt, không gộp chung
@@ -57,16 +72,21 @@ export function JobCard({ job }: { job: JobCardData }) {
             {job.position}
           </Link>
         </h3>
-        <span
-          className={
-            "shrink-0 rounded-full px-2 py-0.5 text-xs font-medium " +
-            (job.statusRaw === "OPEN"
-              ? "bg-[var(--brand-teal-soft)] text-[var(--brand-teal)]"
-              : "bg-muted text-muted-foreground")
-          }
-        >
-          {job.statusLabel}
-        </span>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <span
+            className={
+              "rounded-full px-2 py-0.5 text-xs font-medium " +
+              (job.statusRaw === "OPEN"
+                ? "bg-[var(--brand-teal-soft)] text-[var(--brand-teal)]"
+                : "bg-muted text-muted-foreground")
+            }
+          >
+            {job.statusLabel}
+          </span>
+          {isAuthenticated && (
+            <SaveJobButton jobId={job.id} initialSaved={!!isSaved} variant="card" />
+          )}
+        </div>
       </div>
 
       <p className="text-sm text-muted-foreground">

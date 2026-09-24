@@ -13,6 +13,7 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/session";
 import { getLevelCodes } from "@/lib/api/enums";
 import { listJobs, toJobCardData } from "@/lib/api/jobs";
+import { listMySavedJobIds } from "@/lib/api/applications";
 import { INDUSTRIES, JOBS_PER_PAGE, INDUSTRY_BADGE_STYLES, INDUSTRY_BADGE_FALLBACK } from "@/lib/constants";
 import { JobFilterBar } from "./filter-bar";
 import { JobCard } from "./job-card";
@@ -63,6 +64,13 @@ export default async function JobsPage({
   }
 
   const jobs = data.items.map(toJobCardData);
+
+  // Chỉ gọi khi đã đăng nhập — người chưa đăng nhập không có gì để lưu,
+  // gọi thêm 1 API vô ích. KHÔNG lọc theo !isStaff ở đây (khác
+  // app/(app)/jobs/[jobId]/page.tsx): _job_card.html hiện nút Lưu job
+  // cho MỌI role kể cả staff, nên cần đúng trạng thái đã lưu cho staff
+  // luôn, không riêng học viên.
+  const savedJobIds = user ? await listMySavedJobIds().catch(() => new Set<string>()) : new Set<string>();
 
   const currentParams = new URLSearchParams();
   if (filters.q) currentParams.set("q", filters.q);
@@ -135,7 +143,12 @@ export default async function JobsPage({
         <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {jobs.map((job) => (
-              <JobCard key={job.id} job={job} />
+              <JobCard
+                key={job.id}
+                job={job}
+                isAuthenticated={!!user}
+                isSaved={savedJobIds.has(job.id)}
+              />
             ))}
           </div>
           <Pagination
