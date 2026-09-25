@@ -127,3 +127,47 @@ export const INDUSTRY_BADGE_STYLES: Record<string, { bg: string; fg: string }> =
 export const INDUSTRY_BADGE_FALLBACK = { bg: "#EDEFEC", fg: "var(--brand-muted-text)" };
 
 export const JOBS_PER_PAGE = 20;
+
+// ---------------------------------------------------------------------------
+// Nhóm 2, Phần 1 — Companies. Copy y hệt PARTNERSHIP_POTENTIAL_MAP
+// (crawler_client/companies.py) + CONTACT_STATUS_MAP (crawler_client/
+// contacts.py) bên Flask.
+
+export const COMPANIES_PER_PAGE = 20;
+
+// HIGH/MEDIUM/LOW/UNVERIFIED — giá trị THẬT gửi lên PATCH /companies
+// (partnership_potential), UNVERIFIED = mặc định "chưa đánh giá", KHÔNG
+// phải "tiềm năng thấp" (xem CompanyOut.partnership_potential ở backend).
+// Đặt tên biến khác PARTNERSHIP_POTENTIALS bên Flask (mảng NHÃN tiếng
+// Việt) có chủ đích: theo đúng nguyên tắc "value gửi API phải là key
+// backend, không phải nhãn hiển thị" (plan dòng 30/1016), <select> ở
+// Next.js dùng thẳng mã HIGH/MEDIUM/LOW/UNVERIFIED làm value, tra nhãn
+// hiển thị qua PARTNERSHIP_POTENTIAL_LABELS — không cần bảng
+// MAP_REV như Flask (vốn phải dịch ngược nhãn -> mã vì HTML value ở đó
+// là chính nhãn tiếng Việt).
+export const PARTNERSHIP_POTENTIAL_CODES = ["HIGH", "MEDIUM", "LOW", "UNVERIFIED"] as const;
+export const PARTNERSHIP_POTENTIAL_LABELS: Record<string, string> = {
+  HIGH: "Cao",
+  MEDIUM: "Trung bình",
+  LOW: "Thấp",
+  UNVERIFIED: "Chưa đánh giá",
+};
+
+// company_size là text tự do nhưng ràng buộc định dạng — khớp y hệt
+// pattern HTML của _company_form.html bên Flask (chỉ số, khoảng trắng,
+// 3 kiểu dấu gạch ngang -/–/—). Dùng CHUNG ở <CompanyForm> (validate
+// client-side, thấy lỗi ngay khi gõ) và company-actions.ts (validate lại
+// ở server action, vì company_size không có enum cố định để chặn hoàn
+// toàn phía backend — xem plan Nhóm 2).
+export const COMPANY_SIZE_PATTERN = /^[\d\s\-–—]+$/;
+
+// Nhãn tiếng Việt cho contact_status — CHỈ dùng để HIỂN THỊ (bảng contact
+// read-only ở /companies/[companyId], Phần 1). Đổi trạng thái/assign
+// contact thuộc Phần 2 (ContactForm, 2 cell trạng thái/assign) — chưa
+// làm ở Phần 1, không cần *_MAP_REV ở đây.
+export const CONTACT_STATUS_LABELS: Record<string, string> = {
+  UNCONTACTED: "Chưa liên hệ",
+  EMAIL_SENT: "Đã gửi email",
+  RESPONDED: "Đã phản hồi",
+  IN_PARTNERSHIP: "Đang hợp tác",
+};
