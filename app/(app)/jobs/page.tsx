@@ -3,20 +3,25 @@
 // jobs.py::index()). Route PUBLIC — xem được khi chưa đăng nhập (plan
 // dòng 359, 855) — KHÔNG gọi requireUser()/requireStaff() ở đây.
 //
-// CHỈ làm chế độ "Phân trang" ở round này (đã chốt phạm vi khi bắt đầu
-// Nhóm 1) — chế độ "Cuộn liên tục" (view=infinite, Route Handler
-// /jobs/more, <InfiniteJobList>) và thanh gạt đổi 2 chế độ CHƯA làm,
-// để round sau. Không hiện thanh gạt (view-toggle) vì chỉ có đúng 1
-// chế độ hoạt động — hiện ra sẽ là 1 link chết.
+// Round 6 (nửa 2/2): thêm chế độ "Cuộn liên tục" (view=infinite,
+// <InfiniteJobList> gọi Route Handler /api/jobs/more) + thanh gạt
+// <ViewToggle> đổi qua lại 2 chế độ — cả 2 đã CHƯA làm ở round trước
+// (chỉ có phần data layer + API, xem app/api/jobs/more/route.ts).
+// Giữ đúng 2 quyết định UX có chủ đích của Flask (plan Nhóm 1, dòng
+// 971): đổi chế độ là 1 điều hướng thật (<Link>, không phải state
+// client), và luôn về đầu danh sách (không "page"/"cursor" nào trong
+// href) khi đổi — <ViewToggle> tự lo phần này.
 
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/session";
 import { getLevelCodes, getProvinceNames } from "@/lib/api/enums";
-import { listJobs, toJobCardData } from "@/lib/api/jobs";
+import { listJobs, listJobsCursor, toJobCardData } from "@/lib/api/jobs";
 import { INDUSTRIES, JOBS_PER_PAGE, INDUSTRY_BADGE_STYLES, INDUSTRY_BADGE_FALLBACK } from "@/lib/constants";
 import { JobFilterBar } from "./filter-bar";
 import { JobCard } from "./job-card";
 import { Pagination } from "./pagination";
+import { ViewToggle } from "./view-toggle";
+import { InfiniteJobList } from "./infinite-job-list";
 
 export const metadata = {
   title: "Việc làm — MindX Career Hub",
@@ -31,6 +36,7 @@ interface JobsPageSearchParams {
   location?: string;
   status?: string;
   page?: string;
+  view?: string;
 }
 
 export default async function JobsPage({
@@ -47,32 +53,19 @@ export default async function JobsPage({
     status: params.status ?? "",
   };
 
+  // Khớp index() bên Flask: giá trị `view` lạ -> fallback "page" (chế
+  // độ mặc định), không phải lỗi.
+  const view = params.view === "infinite" ? "infinite" : "page";
+
   const [user, levels, provinces] = await Promise.all([
     getCurrentUser(),
     getLevelCodes(),
     getProvinceNames(),
   ]);
 
-  let page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
-  let offset = (page - 1) * JOBS_PER_PAGE;
-  let data = await listJobs(filters, { limit: JOBS_PER_PAGE, offset });
-  const totalPages = Math.max(1, Math.ceil(data.total / JOBS_PER_PAGE));
-
-  // Khớp Flask: page vượt quá tổng số trang (vd sửa tay URL) -> ghim
-  // lại về trang cuối cùng còn dữ liệu, gọi lại đúng 1 lần.
-  if (page > totalPages) {
-    page = totalPages;
-    offset = (page - 1) * JOBS_PER_PAGE;
-    data = await listJobs(filters, { limit: JOBS_PER_PAGE, offset });
-  }
-
-  const jobs = data.items.map(toJobCardData);
-
-  // Trạng thái "đã lưu" của từng card KHÔNG fetch ở đây nữa: layout
-  // (app/(app)/layout.tsx, Round 5) fetch 1 lần cho cả (app) và đưa qua
-  // <SavedJobsProvider>, <SaveJobButton> tự đọc — không gọi trùng
-  // GET /me/saved-jobs mỗi lần đổi trang/filter.
-
+  // pagination_filters bên Flask: chỉ filter có giá trị, KHÔNG chứa
+  // "page"/"view" — dùng cho <ViewToggle> (đổi mode) lẫn <Pagination>
+  // (đổi trang, chế độ "page").
   const currentParams = new URLSearchParams();
   if (filters.q) currentParams.set("q", filters.q);
   if (filters.industry) currentParams.set("industry", filters.industry);
@@ -80,8 +73,46 @@ export default async function JobsPage({
   if (filters.location) currentParams.set("location", filters.location);
   if (filters.status) currentParams.set("status", filters.status);
 
-  const from = jobs.length ? offset + 1 : 0;
-  const to = offset + jobs.length;
+  let jobs;
+  let totalJobs: number;
+  let page = 1;
+  let totalPages = 1;
+  let from = 0;
+  let to = 0;
+  let infiniteNextCursor: string | null = null;
+
+  if (view === "infinite") {
+    // Batch đầu tiên render thẳng ở Server Component (không cursor) —
+    // y hệt index.html Flask render sẵn batch đầu, <InfiniteJobList>
+    // chỉ tự gọi API cho các lần "Tải thêm" sau đó.
+    const data = await listJobsCursor(filters, { limit: JOBS_PER_PAGE });
+    jobs = data.items.map(toJobCardData);
+    totalJobs = data.total;
+    infiniteNextCursor = data.next_cursor ?? null;
+  } else {
+    page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
+    let offset = (page - 1) * JOBS_PER_PAGE;
+    let data = await listJobs(filters, { limit: JOBS_PER_PAGE, offset });
+    totalPages = Math.max(1, Math.ceil(data.total / JOBS_PER_PAGE));
+
+    // Khớp Flask: page vượt quá tổng số trang (vd sửa tay URL) -> ghim
+    // lại về trang cuối cùng còn dữ liệu, gọi lại đúng 1 lần.
+    if (page > totalPages) {
+      page = totalPages;
+      offset = (page - 1) * JOBS_PER_PAGE;
+      data = await listJobs(filters, { limit: JOBS_PER_PAGE, offset });
+    }
+
+    jobs = data.items.map(toJobCardData);
+    totalJobs = data.total;
+    from = jobs.length ? offset + 1 : 0;
+    to = offset + jobs.length;
+  }
+
+  // Trạng thái "đã lưu" của từng card KHÔNG fetch ở đây nữa: layout
+  // (app/(app)/layout.tsx, Round 5) fetch 1 lần cho cả (app) và đưa qua
+  // <SavedJobsProvider>, <SaveJobButton> tự đọc — không gọi trùng
+  // GET /me/saved-jobs mỗi lần đổi trang/filter.
 
   return (
     <div className="space-y-6">
@@ -109,10 +140,17 @@ export default async function JobsPage({
 
       <JobFilterBar levels={levels} provinces={provinces} />
 
+      <ViewToggle currentParams={currentParams} view={view} />
+
+      {/* Chế độ "page" có page/per_page để tính khoảng "Hiển thị X–Y / Z"
+          — chế độ "infinite" KHÔNG có 2 biến này (không phân trang cố
+          định, số dòng thực tế tăng dần theo mỗi lần "Tải thêm"), nên
+          chỉ hiện tổng số job phù hợp, không hiện khoảng X–Y (khớp
+          index.html Flask, khối `{% if jobs and view != 'infinite' %}`). */}
       <p className="text-sm text-muted-foreground">
-        {jobs.length > 0
-          ? `Hiển thị ${from}–${to} / ${data.total} job phù hợp`
-          : `${data.total} job phù hợp`}
+        {jobs.length > 0 && view !== "infinite"
+          ? `Hiển thị ${from}–${to} / ${totalJobs} job phù hợp`
+          : `${totalJobs} job phù hợp`}
       </p>
 
       {jobs.length > 0 && (
@@ -141,19 +179,28 @@ export default async function JobsPage({
       )}
 
       {jobs.length > 0 ? (
-        <>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {jobs.map((job) => (
-              <JobCard key={job.id} job={job} isAuthenticated={!!user} />
-            ))}
-          </div>
-          <Pagination
-            basePath="/jobs"
-            currentParams={currentParams}
-            page={page}
-            totalPages={totalPages}
+        view === "infinite" ? (
+          <InfiniteJobList
+            initialJobs={jobs}
+            initialNextCursor={infiniteNextCursor}
+            filters={filters}
+            isAuthenticated={!!user}
           />
-        </>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {jobs.map((job) => (
+                <JobCard key={job.id} job={job} isAuthenticated={!!user} />
+              ))}
+            </div>
+            <Pagination
+              basePath="/jobs"
+              currentParams={currentParams}
+              page={page}
+              totalPages={totalPages}
+            />
+          </>
+        )
       ) : (
         <div className="rounded-md border border-dashed p-8 text-center">
           <p className="mb-4 text-muted-foreground">Chưa có job nào khớp bộ lọc.</p>
