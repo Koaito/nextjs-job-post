@@ -18,6 +18,7 @@ import { toJobCardData } from "@/lib/api/jobs";
 import { PARTNERSHIP_POTENTIAL_LABELS, CONTACT_STATUS_LABELS } from "@/lib/constants";
 import { buttonVariants } from "@/components/ui/button";
 import { DeleteCompanyButton } from "./delete-company-button";
+import { HardDeleteContactButton } from "./hard-delete-contact-button";
 
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return "—";
@@ -26,19 +27,36 @@ function formatDate(iso: string | null | undefined): string {
   return d.toLocaleDateString("vi-VN");
 }
 
-function ContactRow({ contact }: { contact: CompanyContactOut }) {
+function ContactRow({
+  contact,
+  renderActions,
+}: {
+  contact: CompanyContactOut;
+  /** Phần 2 mục 6: chỉ khối "Đã xoá" truyền cột này (nút "Xoá hẳn") —
+   *  bảng contact đang active giữ nguyên read-only như Phần 1 đã chốt. */
+  renderActions?: (contact: CompanyContactOut) => React.ReactNode;
+}) {
   return (
     <tr className="border-b last:border-0">
       <td className="py-1.5 pr-3 font-medium">{contact.contact_name}</td>
       <td className="py-1.5 pr-3 text-muted-foreground">{contact.job_title || "—"}</td>
       <td className="py-1.5 pr-3">{contact.work_email || "—"}</td>
       <td className="py-1.5 pr-3">{contact.phone_number || "—"}</td>
-      <td className="py-1.5 pr-3">{CONTACT_STATUS_LABELS[contact.contact_status] ?? contact.contact_status}</td>
+      {!renderActions && (
+        <td className="py-1.5 pr-3">{CONTACT_STATUS_LABELS[contact.contact_status] ?? contact.contact_status}</td>
+      )}
+      {renderActions && <td className="py-1.5 pr-3 text-right">{renderActions(contact)}</td>}
     </tr>
   );
 }
 
-function ContactTable({ contacts }: { contacts: CompanyContactOut[] }) {
+function ContactTable({
+  contacts,
+  renderActions,
+}: {
+  contacts: CompanyContactOut[];
+  renderActions?: (contact: CompanyContactOut) => React.ReactNode;
+}) {
   return (
     <table className="w-full text-sm">
       <thead className="border-b text-left text-xs text-muted-foreground">
@@ -47,12 +65,13 @@ function ContactTable({ contacts }: { contacts: CompanyContactOut[] }) {
           <th className="py-1.5 pr-3 font-medium">Chức danh</th>
           <th className="py-1.5 pr-3 font-medium">Email</th>
           <th className="py-1.5 pr-3 font-medium">SĐT</th>
-          <th className="py-1.5 pr-3 font-medium">Trạng thái</th>
+          {!renderActions && <th className="py-1.5 pr-3 font-medium">Trạng thái</th>}
+          {renderActions && <th className="py-1.5 pr-3 font-medium text-right">Thao tác</th>}
         </tr>
       </thead>
       <tbody>
         {contacts.map((c) => (
-          <ContactRow key={c.contact_id} contact={c} />
+          <ContactRow key={c.contact_id} contact={c} renderActions={renderActions} />
         ))}
       </tbody>
     </table>
@@ -152,8 +171,21 @@ export default async function CompanyDetailPage({
                 <summary className="cursor-pointer text-sm text-muted-foreground underline">
                   Đã xoá ({inactiveContacts.length})
                 </summary>
-                <div className="mt-2 overflow-x-auto opacity-60">
-                  <ContactTable contacts={inactiveContacts} />
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Đã xoá mềm — có thể xoá hẳn khỏi hệ thống (không thể khôi phục), hoặc để nguyên để giữ lịch sử liên
+                  hệ.
+                </p>
+                <div className="mt-2 overflow-x-auto opacity-80">
+                  <ContactTable
+                    contacts={inactiveContacts}
+                    renderActions={(c) => (
+                      <HardDeleteContactButton
+                        companyId={company.company_id}
+                        contactId={c.contact_id}
+                        contactName={c.contact_name}
+                      />
+                    )}
+                  />
                 </div>
               </details>
             )}
