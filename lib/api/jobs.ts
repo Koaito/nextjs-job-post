@@ -63,9 +63,12 @@ export async function listJobs(
   return callPublic<PaginatedJobs>(`/jobs?${qs}`);
 }
 
-/** Chế độ cuộn liên tục (view=infinite) — CHƯA dùng ở round này (chỉ
- *  làm "Phân trang" trước theo đúng phạm vi đã chốt), giữ lại chữ ký
- *  hàm sẵn để không phải sửa lib/api/jobs.ts lần nữa khi làm tiếp. */
+/** Chế độ cuộn liên tục (view=infinite) — dùng ở Round 6
+ *  (app/api/jobs/more/route.ts + <InfiniteJobList>). Chữ ký hàm giữ y
+ *  hệt như khi mới thêm (round Phân trang trước đó), không cần sửa gì
+ *  thêm ở đây — batch size 20 do NƠI GỌI truyền vào qua `limit`
+ *  (JOBS_PER_PAGE, lib/constants.ts), không hardcode mặc định trong hàm
+ *  này để tránh 2 nguồn sự thật cho cùng 1 con số. */
 export async function listJobsCursor(
   filters: JobFilters,
   { limit, cursor }: { limit: number; cursor?: string | null },
