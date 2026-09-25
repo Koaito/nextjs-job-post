@@ -7,7 +7,7 @@
 // (không phải Dialog) để khớp đúng UX cũ: mở tại chỗ ngay dưới chip,
 // không che khuất cả màn hình.
 
-import { useRef, useState } from "react";
+import { useOptimistic, useRef, useState, useTransition } from "react";
 import { PARTNERSHIP_POTENTIAL_CODES, PARTNERSHIP_POTENTIAL_LABELS } from "@/lib/constants";
 import type { PotentialSuggestion } from "@/lib/company-potential";
 import { updateCompanyPotentialAction } from "@/lib/actions/company-actions";
@@ -31,20 +31,27 @@ export function PotentialCell({
   const detailsRef = useRef<HTMLDetailsElement>(null);
   const [value, setValue] = useState(potential);
   const [note, setNote] = useState("");
-  const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  // Cập nhật lạc quan (khớp plan Nhóm 2: "cập nhật lạc quan (useOptimistic)
+  // badge ngay khi submit") — chip ở <summary> hiện ngay giá trị vừa chọn
+  // trong lúc chờ server, tự rollback về `potential` gốc nếu action lỗi
+  // (React tự làm việc này khi state nguồn không đổi sau khi transition
+  // kết thúc mà không có update mới nào "chốt" giá trị lạc quan).
+  const [optimisticPotential, setOptimisticPotential] = useOptimistic(potential);
 
-  async function handleSave() {
-    setPending(true);
+  function handleSave() {
     setError(null);
-    const result = await updateCompanyPotentialAction(companyId, value, note);
-    setPending(false);
-    if (!result.ok) {
-      setError(result.message);
-      return;
-    }
-    setNote("");
-    if (detailsRef.current) detailsRef.current.open = false;
+    startTransition(async () => {
+      setOptimisticPotential(value);
+      const result = await updateCompanyPotentialAction(companyId, value, note);
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      setNote("");
+      if (detailsRef.current) detailsRef.current.open = false;
+    });
   }
 
   function handleCancel() {
@@ -58,9 +65,9 @@ export function PotentialCell({
     <details ref={detailsRef} className="relative inline-block">
       <summary className="cursor-pointer list-none">
         <span
-          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${CHIP_STYLES[potential] ?? CHIP_STYLES.UNVERIFIED}`}
+          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${CHIP_STYLES[optimisticPotential] ?? CHIP_STYLES.UNVERIFIED} ${isPending ? "opacity-60" : ""}`}
         >
-          {PARTNERSHIP_POTENTIAL_LABELS[potential] ?? potential}
+          {PARTNERSHIP_POTENTIAL_LABELS[optimisticPotential] ?? optimisticPotential}
         </span>
       </summary>
 
@@ -84,7 +91,7 @@ export function PotentialCell({
         <select
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          disabled={pending}
+          disabled={isPending}
           className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
         >
           {PARTNERSHIP_POTENTIAL_CODES.map((code) => (
@@ -97,7 +104,7 @@ export function PotentialCell({
         <textarea
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          disabled={pending}
+          disabled={isPending}
           rows={2}
           placeholder="Lý do đổi tiềm năng — không bắt buộc…"
           className="w-full rounded-md border px-2 py-1.5 text-sm"
@@ -106,16 +113,16 @@ export function PotentialCell({
         {error && <p className="text-xs text-destructive">{error}</p>}
 
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={handleCancel} disabled={pending} className="text-xs text-muted-foreground underline">
+          <button type="button" onClick={handleCancel} disabled={isPending} className="text-xs text-muted-foreground underline">
             Hủy
           </button>
           <button
             type="button"
             onClick={handleSave}
-            disabled={pending}
+            disabled={isPending}
             className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground disabled:opacity-50"
           >
-            {pending ? "Đang lưu…" : "Lưu"}
+            {isPending ? "Đang lưu…" : "Lưu"}
           </button>
         </div>
       </div>

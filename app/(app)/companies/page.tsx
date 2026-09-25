@@ -26,6 +26,12 @@ interface CompaniesPageSearchParams {
   q?: string;
   city?: string;
   page?: string;
+  /** Thông báo 1 lần sau khi điều hướng từ nơi khác về đây (vd xoá công
+   *  ty ở delete-company-button.tsx redirect `/companies?notice=...`) —
+   *  cùng pattern `notice` đã dùng ở /companies/[companyId]/page.tsx.
+   *  Thiếu nhánh này khiến thông báo "Đã xoá công ty." bị mất tích sau
+   *  khi xoá — bug tự phát hiện khi rà lại, sửa ở round ngay sau Phần 1. */
+  notice?: string;
 }
 
 export default async function CompaniesPage({
@@ -35,6 +41,7 @@ export default async function CompaniesPage({
 }) {
   await requireStaff();
   const params = await searchParams;
+  const notice = params.notice;
   const filters = {
     q: (params.q ?? "").trim(),
     city: params.city ?? "",
@@ -65,6 +72,12 @@ export default async function CompaniesPage({
 
   return (
     <div className="space-y-6">
+      {notice && (
+        <p role="status" className="rounded-md bg-muted px-3 py-2 text-sm">
+          {notice}
+        </p>
+      )}
+
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <span className="text-sm text-muted-foreground">Career Hub / Doanh nghiệp</span>
