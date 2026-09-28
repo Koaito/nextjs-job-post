@@ -1,5 +1,5 @@
 // app/(app)/contacts/layout.tsx
-// Layout chung của /contacts và (Phần 3) /contacts/email-templates — chỉ
+// Layout chung của /contacts và /contacts/email-templates — chỉ
 // chứa tab-nav; mỗi page tự render header (tiêu đề/mô tả khác nhau theo
 // tab, và nút "＋ Thêm người liên hệ" chỉ có ở tab danh sách, giống
 // contacts.html). Khác Flask ở thứ tự: tab-nav nằm TRÊN header vì layout

@@ -7,7 +7,8 @@
 // (<EditContactDialog>) mỗi dòng contact đang active; cột Trạng thái là
 // <ContactStatusCell> đổi tại chỗ (mục 3 — Flask company_detail cũng chỉ có
 // cell trạng thái, không có cell phụ trách) và nút "Xóa" xoá mềm
-// (<DeleteContactButton>, mục 5). Nếu GET
+// (<DeleteContactButton>, mục 5); nút "✉ Mẫu email" (Phần 3,
+// <EmailTemplatePickerModal>) đứng đầu cột Thao tác. Nếu GET
 // /companies/{id}/contacts lỗi (vd token hết hạn giữa lúc load 2 request
 // song song) -> catch về [] thay vì làm sập cả trang chi tiết công ty chỉ
 // vì phần phụ này, khớp tinh thần "job chính hiện được là ưu tiên" của
@@ -25,6 +26,7 @@ import { DeleteCompanyButton } from "./delete-company-button";
 import { EditContactDialog } from "@/components/edit-contact-dialog";
 import { ContactStatusCell } from "@/components/contact-cells";
 import { DeleteContactButton } from "@/components/delete-contact-button";
+import { EmailTemplatePickerModal } from "@/components/email-template-picker-modal";
 import { HardDeleteContactButton } from "./hard-delete-contact-button";
 
 function formatDate(iso: string | null | undefined): string {
@@ -187,6 +189,14 @@ export default async function CompanyDetailPage({
                   contacts={activeContacts}
                   renderActions={(c) => (
                     <>
+                      <EmailTemplatePickerModal
+                        context={{
+                          companyName: company.company_name,
+                          contactName: c.contact_name,
+                          contactTitle: c.job_title ?? "",
+                          contactStatus: c.contact_status,
+                        }}
+                      />
                       <EditContactDialog
                         companyId={company.company_id}
                         companyName={company.company_name}

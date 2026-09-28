@@ -7,8 +7,8 @@
 // cột Trạng thái / Phụ trách là 2 cell đổi tại chỗ (<ContactStatusCell>,
 // <ContactAssignCell>, components/contact-cells.tsx). Mục 5: nút "Xóa" xoá
 // mềm (<DeleteContactButton> — xin note bắt buộc, ở lại trang này; sửa bug
-// Flask). Cố ý CHƯA có (không dựng nút chết):
-//   - Phần 3: nút "✉ Mẫu email" (EmailTemplatePickerModal).
+// Flask). Phần 3: nút "✉ Mẫu email" (<EmailTemplatePickerModal>) ở cột
+// "Thao tác", đúng vị trí đầu tiên như _contact_list.html.
 //
 // Không phân trang: GET /contacts trả thẳng mảng (không có `total`), Flask
 // cũng render hết — giữ nguyên.
@@ -24,6 +24,7 @@ import { CONTACT_STATUS_CODES } from "@/lib/constants";
 import { ContactStatusCell, ContactAssignCell } from "@/components/contact-cells";
 import { EditContactDialog } from "@/components/edit-contact-dialog";
 import { DeleteContactButton } from "@/components/delete-contact-button";
+import { EmailTemplatePickerModal } from "@/components/email-template-picker-modal";
 import { ContactFilterBar } from "./filter-bar";
 
 export const dynamic = "force-dynamic";
@@ -180,6 +181,14 @@ export default async function ContactsPage({
                     />
                   </td>
                   <td className="px-3 py-2 text-right">
+                    <EmailTemplatePickerModal
+                      context={{
+                        companyName: c.company_name ?? "",
+                        contactName: c.contact_name,
+                        contactTitle: c.job_title ?? "",
+                        contactStatus: c.contact_status,
+                      }}
+                    />
                     <EditContactDialog
                       companyId={c.company_id}
                       companyName={c.company_name}
