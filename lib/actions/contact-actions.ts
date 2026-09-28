@@ -3,8 +3,8 @@
 // lib/actions/contact-actions.ts
 // Phần 2: mục 2 (createContactAction/updateContactAction cho <ContactForm>)
 // và mục 6 (hardDeleteContactAction, nút "Xoá hẳn" ở /companies/[companyId]).
-// CHƯA làm: assignContact/deleteContact (soft) và đổi status tại chỗ —
-// Phần 2 mục 3-5.
+// mục 3 (updateContactStatusAction/assignContactAction cho 2 cell đổi tại
+// chỗ). CHƯA làm: deleteContact (soft) — Phần 2 mục 5.
 
 import { revalidatePath } from "next/cache";
 import { ApiError } from "@/lib/api/client";
@@ -12,10 +12,13 @@ import { createCompany } from "@/lib/api/companies";
 import {
   createContact,
   updateContact,
+  updateContactStatus,
+  assignContact,
   hardDeleteContact,
   isContactNotFound,
   type ContactInput,
 } from "@/lib/api/contacts";
+import { CONTACT_STATUS_CODES } from "@/lib/constants";
 import type { CompanyFieldValue } from "@/components/company-combobox";
 
 export interface ContactNoteActionResult {
@@ -143,5 +146,55 @@ export async function updateContactAction(
   } catch (err) {
     const message = err instanceof ApiError ? err.message : "Không thể cập nhật người liên hệ, thử lại sau.";
     return { ok: false, errorMessage: message };
+  }
+}
+
+/**
+ * Đổi trạng thái liên hệ tại chỗ (cell ở /contacts và /companies/[id]).
+ * note BẮT BUỘC khi status thật sự đổi — <ContactStatusCell> đã tự chỉ cho
+ * gửi khi có đổi + có note; backend vẫn chặn cứng (422). Message lỗi backend
+ * (tiếng Việt) trả nguyên ra dialog.
+ *
+ * revalidatePath cho 2 trang chứa cell; cell tự router.refresh() để cả
+ * trang thứ 3 (vd /staff-activity/[id] sau này) cũng lấy dữ liệu mới.
+ */
+export async function updateContactStatusAction(
+  companyId: string,
+  contactId: string,
+  status: string,
+  note: string,
+): Promise<ContactNoteActionResult> {
+  if (!(CONTACT_STATUS_CODES as readonly string[]).includes(status)) {
+    return { ok: false, message: "Trạng thái không hợp lệ." };
+  }
+  try {
+    await updateContactStatus(companyId, contactId, status, note);
+    revalidatePath("/contacts");
+    revalidatePath(`/companies/${companyId}`);
+    return { ok: true, message: "Đã cập nhật trạng thái liên hệ." };
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : "Không thể cập nhật trạng thái, thử lại sau.";
+    return { ok: false, message };
+  }
+}
+
+/**
+ * Gán/đổi/bỏ gán người phụ trách tại chỗ. assigneeId "" = bỏ gán — vẫn
+ * truyền xuống assignContact() (luôn gửi field, plan dòng 989).
+ */
+export async function assignContactAction(
+  companyId: string,
+  contactId: string,
+  assigneeId: string,
+  note: string,
+): Promise<ContactNoteActionResult> {
+  try {
+    await assignContact(companyId, contactId, assigneeId, note);
+    revalidatePath("/contacts");
+    revalidatePath(`/companies/${companyId}`);
+    return { ok: true, message: "Đã cập nhật người phụ trách." };
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : "Không thể cập nhật người phụ trách, thử lại sau.";
+    return { ok: false, message };
   }
 }

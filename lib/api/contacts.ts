@@ -3,8 +3,8 @@
 //
 // Đã làm: list theo company (bảng read-only ở /companies/[companyId]),
 // list gộp toàn hệ thống (/contacts, Nhóm 2 Phần 2 mục 1), tạo/sửa
-// (Phần 2 mục 2, <ContactForm>), hard-delete (Phần 2 mục 6). CHƯA làm:
-// đổi status/assign tại chỗ và xoá mềm — Phần 2 mục 3-5.
+// (Phần 2 mục 2, <ContactForm>), đổi status/assign tại chỗ (mục 3),
+// hard-delete (mục 6). CHƯA làm: xoá mềm — Phần 2 mục 5.
 //
 // TOÀN BỘ route /companies/{id}/contacts yêu cầu require_role("ss_team")
 // ở backend (thông tin liên hệ nhạy cảm — email/SĐT cá nhân, khác GET
@@ -16,6 +16,7 @@ import type { components } from "./types";
 export type CompanyContactOut = components["schemas"]["CompanyContactOut"];
 type CompanyContactCreate = components["schemas"]["CompanyContactCreate"];
 type CompanyContactUpdate = components["schemas"]["CompanyContactUpdate"];
+type ContactAssignUpdate = components["schemas"]["ContactAssignUpdate"];
 /** Như CompanyContactOut nhưng kèm `company_name` — response của GET
  *  /contacts (danh sách gộp toàn hệ thống, Nhóm 2 Phần 2 mục 1). */
 export type CompanyContactWithCompanyOut = components["schemas"]["CompanyContactWithCompanyOut"];
@@ -163,6 +164,55 @@ export async function updateContact(
     note: note?.trim() || null,
   };
   return callAuthed<CompanyContactOut>(`/companies/${companyId}/contacts/${contactId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+// --- Phần 2, mục 3: đổi trạng thái / đổi người phụ trách tại chỗ.
+
+/**
+ * PATCH /companies/{company_id}/contacts/{contact_id} với payload TỐI GIẢN
+ * (chỉ contact_status + note) — KHÔNG dùng chung updateContact() ở trên (hàm
+ * đó luôn gửi cả 6 field <ContactForm>; ở đây chỉ đổi đúng 1 field). Khớp
+ * update_contact_status() bên Flask. `status` là MÃ backend (UNCONTACTED...),
+ * không phải nhãn Việt như Flask. note BẮT BUỘC nếu status thật sự đổi.
+ */
+export async function updateContactStatus(
+  companyId: string,
+  contactId: string,
+  status: string,
+  note?: string,
+): Promise<CompanyContactOut> {
+  const payload: CompanyContactUpdate = {
+    contact_status: status,
+    note: note?.trim() || null,
+  };
+  return callAuthed<CompanyContactOut>(`/companies/${companyId}/contacts/${contactId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+/**
+ * PATCH /companies/{company_id}/contacts/{contact_id}/assign — gán/đổi/BỎ
+ * gán người phụ trách. Plan (Nhóm 2, dòng 989): field `assigned_ss_user`
+ * LUÔN có mặt trong body, kể cả khi bỏ gán (gửi null tường minh) — khác PATCH
+ * thường "không gửi = giữ nguyên"; vì vậy KHÔNG build payload kiểu "chỉ gửi
+ * field có giá trị" ở đây. assigneeId rỗng/null = bỏ gán. note BẮT BUỘC nếu
+ * người phụ trách thật sự đổi.
+ */
+export async function assignContact(
+  companyId: string,
+  contactId: string,
+  assigneeId: string | null,
+  note?: string,
+): Promise<CompanyContactOut> {
+  const payload: ContactAssignUpdate = {
+    assigned_ss_user: assigneeId || null,
+    note: note?.trim() || null,
+  };
+  return callAuthed<CompanyContactOut>(`/companies/${companyId}/contacts/${contactId}/assign`, {
     method: "PATCH",
     body: JSON.stringify(payload),
   });

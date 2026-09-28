@@ -3,14 +3,12 @@
 // blueprints/contacts.py::_contact_list_tab() bên Flask (Nhóm 2, Phần 2,
 // mục 1 của plan). Staff-only — khớp @staff_required.
 //
-// PHẠM VI mục 1: chỉ ĐỌC + lọc. Cố ý CHƯA có (làm ở các mục sau, không
-// dựng link/nút chết):
-//   - mục 3: cell đổi trạng thái / đổi người phụ trách tại chỗ — ở đây 2
-//     cột này hiện read-only;
-//   - mục 2: link "Sửa" contact (<ContactForm>);
+// Mục 1: đọc + lọc. Mục 2-3: cột "Thao tác" có nút "Sửa" (<EditContactDialog>);
+// cột Trạng thái / Phụ trách là 2 cell đổi tại chỗ (<ContactStatusCell>,
+// <ContactAssignCell>, components/contact-cells.tsx). Cố ý CHƯA có (làm ở
+// mục sau, không dựng nút chết):
 //   - mục 5: nút "Xóa" (NoteConfirmDialog noteRequired);
 //   - Phần 3: nút "✉ Mẫu email" (EmailTemplatePickerModal).
-// Vì vậy chưa có cột thao tác ở cuối bảng.
 //
 // Không phân trang: GET /contacts trả thẳng mảng (không có `total`), Flask
 // cũng render hết — giữ nguyên.
@@ -22,7 +20,9 @@ import { requireStaff } from "@/lib/auth-guard";
 import { listAllContacts, type CompanyContactWithCompanyOut } from "@/lib/api/contacts";
 import { listAllCompanies } from "@/lib/api/companies";
 import { listStaffUsers } from "@/lib/api/auth";
-import { CONTACT_STATUS_CODES, CONTACT_STATUS_LABELS } from "@/lib/constants";
+import { CONTACT_STATUS_CODES } from "@/lib/constants";
+import { ContactStatusCell, ContactAssignCell } from "@/components/contact-cells";
+import { EditContactDialog } from "@/components/edit-contact-dialog";
 import { ContactFilterBar } from "./filter-bar";
 
 export const dynamic = "force-dynamic";
@@ -92,7 +92,9 @@ export default async function ContactsPage({
 
   const staff = staffRes.status === "fulfilled" ? staffRes.value : [];
   if (staffRes.status === "rejected") errors.push(errorMessage(staffRes.reason));
-  const staffNameById = new Map(staff.map((u) => [u.ss_user_id, u.full_name]));
+  // Nếu tải danh sách nhân sự lỗi (đã hiện thông báo ở trên), cell Phụ trách
+  // vẫn hiện "Đã gán (không rõ tên)" thay vì báo nhầm "Chưa gán".
+  const assignees = staff.map((u) => ({ id: u.ss_user_id, name: u.full_name }));
 
   return (
     <div className="space-y-6">
@@ -144,6 +146,7 @@ export default async function ContactsPage({
                 <th className="px-3 py-2 font-medium">Liên hệ gần nhất</th>
                 <th className="px-3 py-2 font-medium">Trạng thái</th>
                 <th className="px-3 py-2 font-medium">Phụ trách</th>
+                <th className="px-3 py-2 text-right font-medium">Thao tác</th>
               </tr>
             </thead>
             <tbody>
@@ -164,11 +167,31 @@ export default async function ContactsPage({
                   <td className="px-3 py-2 text-muted-foreground">{c.phone_number || "—"}</td>
                   <td className="px-3 py-2 text-muted-foreground">{c.found_source || "—"}</td>
                   <td className="px-3 py-2 text-muted-foreground">{formatDate(c.last_contacted_date)}</td>
-                  <td className="px-3 py-2">{CONTACT_STATUS_LABELS[c.contact_status] ?? c.contact_status}</td>
                   <td className="px-3 py-2">
-                    {c.assigned_ss_user
-                      ? (staffNameById.get(c.assigned_ss_user) ?? "Đã gán (không rõ tên)")
-                      : "— Chưa gán —"}
+                    <ContactStatusCell companyId={c.company_id} contactId={c.contact_id} status={c.contact_status} />
+                  </td>
+                  <td className="px-3 py-2">
+                    <ContactAssignCell
+                      companyId={c.company_id}
+                      contactId={c.contact_id}
+                      assigneeId={c.assigned_ss_user ?? null}
+                      staff={assignees}
+                    />
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <EditContactDialog
+                      companyId={c.company_id}
+                      companyName={c.company_name}
+                      contactId={c.contact_id}
+                      initialValues={{
+                        contactName: c.contact_name,
+                        title: c.job_title ?? "",
+                        email: c.work_email ?? "",
+                        contactLink: c.social_link ?? "",
+                        phone: c.phone_number ?? "",
+                        source: c.found_source ?? "",
+                      }}
+                    />
                   </td>
                 </tr>
               ))}

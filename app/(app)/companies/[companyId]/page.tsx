@@ -4,8 +4,10 @@
 //
 // Bảng "Người liên hệ": Phần 1 để read-only; Phần 2 mục 2 thêm nút "Thêm
 // người liên hệ" (route /companies/[companyId]/contacts/add) và nút "Sửa"
-// (<EditContactDialog>) mỗi dòng contact đang active. Đổi trạng thái/assign
-// tại chỗ thuộc mục 3, xoá mềm thuộc mục 5 — chưa làm. Nếu GET
+// (<EditContactDialog>) mỗi dòng contact đang active; cột Trạng thái là
+// <ContactStatusCell> đổi tại chỗ (mục 3 — Flask company_detail cũng chỉ có
+// cell trạng thái, không có cell phụ trách). Xoá mềm thuộc mục 5 — chưa
+// làm. Nếu GET
 // /companies/{id}/contacts lỗi (vd token hết hạn giữa lúc load 2 request
 // song song) -> catch về [] thay vì làm sập cả trang chi tiết công ty chỉ
 // vì phần phụ này, khớp tinh thần "job chính hiện được là ưu tiên" của
@@ -17,10 +19,11 @@ import { requireStaff } from "@/lib/auth-guard";
 import { getCompany } from "@/lib/api/companies";
 import { listContactsByCompany, type CompanyContactOut } from "@/lib/api/contacts";
 import { toJobCardData } from "@/lib/api/jobs";
-import { PARTNERSHIP_POTENTIAL_LABELS, CONTACT_STATUS_LABELS } from "@/lib/constants";
+import { PARTNERSHIP_POTENTIAL_LABELS } from "@/lib/constants";
 import { buttonVariants } from "@/components/ui/button";
 import { DeleteCompanyButton } from "./delete-company-button";
 import { EditContactDialog } from "@/components/edit-contact-dialog";
+import { ContactStatusCell } from "@/components/contact-cells";
 import { HardDeleteContactButton } from "./hard-delete-contact-button";
 
 function formatDate(iso: string | null | undefined): string {
@@ -49,7 +52,13 @@ function ContactRow({
       <td className="py-1.5 pr-3">{contact.work_email || "—"}</td>
       <td className="py-1.5 pr-3">{contact.phone_number || "—"}</td>
       {showStatus && (
-        <td className="py-1.5 pr-3">{CONTACT_STATUS_LABELS[contact.contact_status] ?? contact.contact_status}</td>
+        <td className="py-1.5 pr-3">
+          <ContactStatusCell
+            companyId={contact.company_id}
+            contactId={contact.contact_id}
+            status={contact.contact_status}
+          />
+        </td>
       )}
       {renderActions && <td className="py-1.5 pr-3 text-right">{renderActions(contact)}</td>}
     </tr>
@@ -171,9 +180,6 @@ export default async function CompanyDetailPage({
                 ＋ Thêm người liên hệ
               </Link>
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Đổi trạng thái và người phụ trách tại chỗ sẽ có ở phần tiếp theo.
-            </p>
             {activeContacts.length > 0 ? (
               <div className="mt-2 overflow-x-auto">
                 <ContactTable
