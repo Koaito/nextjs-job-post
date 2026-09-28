@@ -8,9 +8,8 @@
 //
 // XOÁ HẲN (hard delete, KHÁC hẳn company/contact vốn soft-delete) — plan
 // Nhóm 2: không cần UI "khôi phục", chỉ cần xác nhận thông thường.
-// note: CREATE không bắt buộc; UPDATE/DELETE bắt buộc (UPDATE chỉ khi có
-// field thật sự đổi — backend tự so diff; khác luật riêng của Contact/
-// Company ở chỗ DELETE luôn bắt buộc vô điều kiện).
+// note: CREATE không bắt buộc; UPDATE/DELETE bắt buộc vô điều kiện (KHÔNG áp
+// luật "chỉ khi có thay đổi thật" — luật đó chỉ dành cho Contact/Company).
 
 import { callAuthed, ApiError } from "./client";
 import type { components } from "./types";
@@ -107,8 +106,8 @@ export async function createEmailTemplate(input: EmailTemplateInput, note?: stri
  * (form hiện dòng báo cho staff biết). recommended_for thì gửi được mảng
  * rỗng (= bỏ hết gợi ý) vì backend chỉ bỏ qua khi là null.
  *
- * note BẮT BUỘC nếu có field thật sự đổi (422 nếu thiếu) — <EmailTemplateForm>
- * tự so sánh với giá trị gốc để chỉ đòi note khi cần.
+ * note BẮT BUỘC vô điều kiện (plan Nhóm 2) — <EmailTemplateForm> và
+ * updateEmailTemplateAction đã chặn note rỗng trước khi tới đây.
  */
 export async function updateEmailTemplate(
   templateId: string,

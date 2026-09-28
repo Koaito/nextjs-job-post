@@ -3,13 +3,12 @@
 // Form thêm/sửa mẫu email — phần form của _email_template_manager.html
 // (Flask). Nhóm 2, Phần 3 của plan.
 //
-// Luật note:
+// Luật note (plan Nhóm 2, dòng "Xoá 1 mẫu email là hard-delete thật"):
 //   - Thêm mới: KHÔNG bắt buộc.
-//   - Sửa: BẮT BUỘC nhưng CHỈ khi có field thật sự đổi so với giá trị gốc
-//     (Flask luôn gắn `required` vô điều kiện cho ô note ở form sửa —
-//     Next.js làm "khôn" hơn theo đúng hướng plan cho phép, xem
-//     `hasEffectiveChange` bên dưới). Backend vẫn là lớp chặn cuối (422).
-//     Không có gì đổi -> khỏi gọi API.
+//   - Sửa: BẮT BUỘC vô điều kiện — lần nào bấm Lưu cũng phải có note, KHÔNG
+//     áp luật "chỉ bắt khi có thay đổi thật" (luật đó chỉ dành riêng cho
+//     Contact/Company). Note tự .trim() và chặn submit nếu rỗng (plan
+//     dòng 192).
 //
 // Lỗi validate (server action trả fieldErrors): tô đỏ tại chỗ + GIỮ NGUYÊN
 // mọi thứ đã nhập (plan Nhóm 1, add_hub) — state form nằm ở component này
@@ -38,39 +37,6 @@ const labelClass = "mb-1 block text-sm font-medium";
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
   return <p className="mt-1 text-xs text-destructive">{message}</p>;
-}
-
-/** So sánh theo GIÁ TRỊ (không theo tham chiếu): recommendedFor là mảng
- *  nên sắp xếp trước khi so — thứ tự tick checkbox không phải "thay đổi". */
-function sameSet(a: string[], b: string[]): boolean {
-  if (a.length !== b.length) return false;
-  const sb = [...b].sort();
-  return [...a].sort().every((v, i) => v === sb[i]);
-}
-
-function normalizeOrder(raw: string): number {
-  const n = Number.parseInt(raw.trim(), 10);
-  return Number.isFinite(n) ? n : 0;
-}
-
-/**
- * Có field nào THẬT SỰ đổi so với giá trị gốc không? Khớp đúng cách backend
- * tính diff:
- *  - description xoá trắng KHÔNG tính là đổi: backend coi null = "giữ
- *    nguyên" nên gửi lên cũng không xoá được (form hiện dòng báo — xem
- *    `clearedDescription`). Tính là đổi sẽ đòi note rồi backend vẫn giữ
- *    nguyên mô tả cũ -> vô nghĩa.
- *  - title/body được so sau khi trim title (backend .strip() title) nhưng
- *    body so nguyên văn (backend giữ nguyên khoảng trắng của body).
- */
-function hasEffectiveChange(now: EmailTemplateInput, initial: EmailTemplateInput): boolean {
-  if (now.title.trim() !== initial.title.trim()) return true;
-  if (now.body !== initial.body) return true;
-  const desc = now.description.trim();
-  if (desc !== "" && desc !== initial.description.trim()) return true;
-  if (!sameSet(now.recommendedFor, initial.recommendedFor)) return true;
-  if (normalizeOrder(now.displayOrder) !== normalizeOrder(initial.displayOrder)) return true;
-  return false;
 }
 
 type EmailTemplateFormProps = {
@@ -108,8 +74,8 @@ export function EmailTemplateForm(props: EmailTemplateFormProps) {
     }));
   }
 
-  const changed = props.mode === "edit" ? hasEffectiveChange(values, props.initialValues) : false;
-  const noteRequired = isEdit && changed;
+  // Sửa mẫu email: note luôn bắt buộc (không phụ thuộc có đổi field hay không).
+  const noteRequired = isEdit;
   const clearedDescription =
     props.mode === "edit" && values.description.trim() === "" && props.initialValues.description.trim() !== "";
 
@@ -118,18 +84,10 @@ export function EmailTemplateForm(props: EmailTemplateFormProps) {
     setErrorMessage(null);
     setFieldErrors({});
 
-    if (props.mode === "edit") {
-      if (!changed) {
-        // Không có gì thật sự đổi -> khỏi gọi API (backend cũng bỏ qua yêu
-        // cầu note khi không có thay đổi, nhưng không cần round-trip).
-        props.onSuccess("Không có thay đổi nào để lưu.");
-        return;
-      }
-      if (!activityNote.trim()) {
-        setFieldErrors({ activityNote: "Vui lòng nhập lý do sửa." });
-        setErrorMessage("Sửa mẫu email bắt buộc phải có ghi chú lý do.");
-        return;
-      }
+    if (props.mode === "edit" && !activityNote.trim()) {
+      setFieldErrors({ activityNote: "Vui lòng nhập lý do sửa." });
+      setErrorMessage("Sửa mẫu email bắt buộc phải có ghi chú lý do.");
+      return;
     }
 
     setIsPending(true);
@@ -269,15 +227,7 @@ export function EmailTemplateForm(props: EmailTemplateFormProps) {
         <label htmlFor="etf-note" className={labelClass}>
           {isEdit ? (
             <>
-              Ghi chú lịch sử thao tác
-              {noteRequired ? (
-                <>
-                  {" "}
-                  — <strong>bắt buộc</strong> <span className="text-destructive">*</span>
-                </>
-              ) : (
-                " (chỉ bắt buộc khi bạn sửa thông tin)"
-              )}
+              Ghi chú lịch sử thao tác — <strong>bắt buộc</strong> <span className="text-destructive">*</span>
             </>
           ) : (
             "Ghi chú lịch sử thao tác (không bắt buộc)"

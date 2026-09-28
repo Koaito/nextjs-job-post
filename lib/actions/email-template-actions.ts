@@ -7,9 +7,9 @@
 //
 // Luật note (plan Nhóm 2, dòng "Xoá 1 mẫu email là hard-delete thật"):
 //   CREATE  -> note KHÔNG bắt buộc.
-//   UPDATE  -> note BẮT BUỘC khi có field thật sự đổi (backend tự so diff,
-//              trả 422 nếu thiếu; <EmailTemplateForm> đã tự chặn trước ở
-//              client để khỏi round-trip vô ích).
+//   UPDATE  -> note BẮT BUỘC vô điều kiện (KHÔNG áp luật "chỉ khi có thay
+//              đổi thật" — luật đó chỉ dành cho Contact/Company). Chặn ở
+//              cả client (<EmailTemplateForm>) lẫn server action này.
 //   DELETE  -> note BẮT BUỘC vô điều kiện, KHÔNG áp luật diff.
 
 import { revalidatePath } from "next/cache";
@@ -86,6 +86,8 @@ export async function updateEmailTemplateAction(
   activityNote: string,
 ): Promise<EmailTemplateFormActionResult> {
   const fieldErrors = validateTemplateInput(input);
+  // Note tự .trim() và chặn rỗng trước khi gọi API (plan dòng 192).
+  if (!activityNote.trim()) fieldErrors.activityNote = "Vui lòng nhập lý do sửa.";
   if (Object.keys(fieldErrors).length > 0) {
     return { ok: false, fieldErrors, errorMessage: "Vui lòng kiểm tra lại các trường còn thiếu." };
   }
