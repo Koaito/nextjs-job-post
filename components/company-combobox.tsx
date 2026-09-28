@@ -47,11 +47,18 @@ export function CompanyCombobox({
   value,
   onChange,
   disabled = false,
+  idPrefix = "cc",
 }: {
   companies: CompanyOption[];
   value: CompanyFieldValue;
   onChange: (value: CompanyFieldValue) => void;
   disabled?: boolean;
+  /** Tiền tố cho id các ô input/listbox bên trong. /them-moi mount CẢ tab
+   *  Job lẫn tab Người liên hệ cùng lúc (tab không active chỉ ẩn bằng CSS),
+   *  nên 2 combobox cùng tồn tại trong DOM — id trùng "cc-*" làm <label
+   *  htmlFor> của tab này focus nhầm ô của tab kia. Mặc định "cc" giữ
+   *  nguyên hành vi cũ của JobForm; ContactForm truyền prefix riêng. */
+  idPrefix?: string;
 }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -110,11 +117,11 @@ export function CompanyCombobox({
         </div>
 
         <div>
-          <label htmlFor="cc-company-name" className="mb-1 block text-sm font-medium">
+          <label htmlFor={`${idPrefix}-company-name`} className="mb-1 block text-sm font-medium">
             Tên công ty <span className="text-destructive">*</span>
           </label>
           <input
-            id="cc-company-name"
+            id={`${idPrefix}-company-name`}
             required
             disabled={disabled}
             value={value.companyName}
@@ -125,11 +132,11 @@ export function CompanyCombobox({
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <label htmlFor="cc-tax-id" className="mb-1 block text-sm font-medium">
+            <label htmlFor={`${idPrefix}-tax-id`} className="mb-1 block text-sm font-medium">
               Mã số thuế
             </label>
             <input
-              id="cc-tax-id"
+              id={`${idPrefix}-tax-id`}
               disabled={disabled}
               value={value.taxId}
               onChange={(e) => onChange({ ...value, taxId: e.target.value })}
@@ -138,11 +145,11 @@ export function CompanyCombobox({
             />
           </div>
           <div>
-            <label htmlFor="cc-website" className="mb-1 block text-sm font-medium">
+            <label htmlFor={`${idPrefix}-website`} className="mb-1 block text-sm font-medium">
               Website
             </label>
             <input
-              id="cc-website"
+              id={`${idPrefix}-website`}
               disabled={disabled}
               value={value.website}
               onChange={(e) => onChange({ ...value, website: e.target.value })}
@@ -150,11 +157,11 @@ export function CompanyCombobox({
             />
           </div>
           <div>
-            <label htmlFor="cc-industry" className="mb-1 block text-sm font-medium">
+            <label htmlFor={`${idPrefix}-industry`} className="mb-1 block text-sm font-medium">
               Lĩnh vực
             </label>
             <select
-              id="cc-industry"
+              id={`${idPrefix}-industry`}
               disabled={disabled}
               value={value.industry}
               onChange={(e) => onChange({ ...value, industry: e.target.value })}
@@ -169,11 +176,11 @@ export function CompanyCombobox({
             </select>
           </div>
           <div>
-            <label htmlFor="cc-city" className="mb-1 block text-sm font-medium">
+            <label htmlFor={`${idPrefix}-city`} className="mb-1 block text-sm font-medium">
               Thành phố
             </label>
             <select
-              id="cc-city"
+              id={`${idPrefix}-city`}
               disabled={disabled}
               value={value.city}
               onChange={(e) => onChange({ ...value, city: e.target.value })}
@@ -209,13 +216,13 @@ export function CompanyCombobox({
         placeholder="Gõ để tìm công ty đã có…"
         role="combobox"
         aria-expanded={open}
-        aria-controls="cc-listbox"
+        aria-controls={`${idPrefix}-listbox`}
         className="w-full rounded-md border px-3 py-2 text-sm"
       />
 
       {open && (
         <ul
-          id="cc-listbox"
+          id={`${idPrefix}-listbox`}
           role="listbox"
           className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-md border bg-popover text-sm shadow-md"
         >

@@ -2,8 +2,10 @@
 // Tương đương company_detail.html (Nhóm 2, Phần 1 của plan). Staff-only
 // (requireStaff(), giống /jobs/[jobId]/edit) — khác /jobs/[jobId] (public).
 //
-// Bảng "Người liên hệ" ở đây là READ-ONLY (quyết định đã chốt với user —
-// form/sửa trạng thái/assign contact thuộc Phần 2, chưa làm). Nếu GET
+// Bảng "Người liên hệ": Phần 1 để read-only; Phần 2 mục 2 thêm nút "Thêm
+// người liên hệ" (route /companies/[companyId]/contacts/add) và nút "Sửa"
+// (<EditContactDialog>) mỗi dòng contact đang active. Đổi trạng thái/assign
+// tại chỗ thuộc mục 3, xoá mềm thuộc mục 5 — chưa làm. Nếu GET
 // /companies/{id}/contacts lỗi (vd token hết hạn giữa lúc load 2 request
 // song song) -> catch về [] thay vì làm sập cả trang chi tiết công ty chỉ
 // vì phần phụ này, khớp tinh thần "job chính hiện được là ưu tiên" của
@@ -18,6 +20,7 @@ import { toJobCardData } from "@/lib/api/jobs";
 import { PARTNERSHIP_POTENTIAL_LABELS, CONTACT_STATUS_LABELS } from "@/lib/constants";
 import { buttonVariants } from "@/components/ui/button";
 import { DeleteCompanyButton } from "./delete-company-button";
+import { EditContactDialog } from "@/components/edit-contact-dialog";
 import { HardDeleteContactButton } from "./hard-delete-contact-button";
 
 function formatDate(iso: string | null | undefined): string {
@@ -29,11 +32,14 @@ function formatDate(iso: string | null | undefined): string {
 
 function ContactRow({
   contact,
+  showStatus,
   renderActions,
 }: {
   contact: CompanyContactOut;
-  /** Phần 2 mục 6: chỉ khối "Đã xoá" truyền cột này (nút "Xoá hẳn") —
-   *  bảng contact đang active giữ nguyên read-only như Phần 1 đã chốt. */
+  /** Khối "Đã xoá" không hiện cột Trạng thái (không còn ý nghĩa). */
+  showStatus: boolean;
+  /** Cột "Thao tác": bảng active = nút "Sửa" (mục 2), khối "Đã xoá" =
+   *  nút "Xoá hẳn" (mục 6). */
   renderActions?: (contact: CompanyContactOut) => React.ReactNode;
 }) {
   return (
@@ -42,7 +48,7 @@ function ContactRow({
       <td className="py-1.5 pr-3 text-muted-foreground">{contact.job_title || "—"}</td>
       <td className="py-1.5 pr-3">{contact.work_email || "—"}</td>
       <td className="py-1.5 pr-3">{contact.phone_number || "—"}</td>
-      {!renderActions && (
+      {showStatus && (
         <td className="py-1.5 pr-3">{CONTACT_STATUS_LABELS[contact.contact_status] ?? contact.contact_status}</td>
       )}
       {renderActions && <td className="py-1.5 pr-3 text-right">{renderActions(contact)}</td>}
@@ -52,9 +58,11 @@ function ContactRow({
 
 function ContactTable({
   contacts,
+  showStatus = true,
   renderActions,
 }: {
   contacts: CompanyContactOut[];
+  showStatus?: boolean;
   renderActions?: (contact: CompanyContactOut) => React.ReactNode;
 }) {
   return (
@@ -65,13 +73,13 @@ function ContactTable({
           <th className="py-1.5 pr-3 font-medium">Chức danh</th>
           <th className="py-1.5 pr-3 font-medium">Email</th>
           <th className="py-1.5 pr-3 font-medium">SĐT</th>
-          {!renderActions && <th className="py-1.5 pr-3 font-medium">Trạng thái</th>}
+          {showStatus && <th className="py-1.5 pr-3 font-medium">Trạng thái</th>}
           {renderActions && <th className="py-1.5 pr-3 font-medium text-right">Thao tác</th>}
         </tr>
       </thead>
       <tbody>
         {contacts.map((c) => (
-          <ContactRow key={c.contact_id} contact={c} renderActions={renderActions} />
+          <ContactRow key={c.contact_id} contact={c} showStatus={showStatus} renderActions={renderActions} />
         ))}
       </tbody>
     </table>
@@ -154,13 +162,38 @@ export default async function CompanyDetailPage({
           </section>
 
           <section className="rounded-md border p-4">
-            <h4 className="font-heading font-semibold">Người liên hệ ({activeContacts.length})</h4>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h4 className="font-heading font-semibold">Người liên hệ ({activeContacts.length})</h4>
+              <Link
+                href={`/companies/${company.company_id}/contacts/add`}
+                className={buttonVariants({ variant: "outline", size: "sm" })}
+              >
+                ＋ Thêm người liên hệ
+              </Link>
+            </div>
             <p className="mt-1 text-xs text-muted-foreground">
-              Chỉ xem — sửa trạng thái, assign hoặc thêm người liên hệ mới sẽ có ở phần tiếp theo.
+              Đổi trạng thái và người phụ trách tại chỗ sẽ có ở phần tiếp theo.
             </p>
             {activeContacts.length > 0 ? (
               <div className="mt-2 overflow-x-auto">
-                <ContactTable contacts={activeContacts} />
+                <ContactTable
+                  contacts={activeContacts}
+                  renderActions={(c) => (
+                    <EditContactDialog
+                      companyId={company.company_id}
+                      companyName={company.company_name}
+                      contactId={c.contact_id}
+                      initialValues={{
+                        contactName: c.contact_name,
+                        title: c.job_title ?? "",
+                        email: c.work_email ?? "",
+                        contactLink: c.social_link ?? "",
+                        phone: c.phone_number ?? "",
+                        source: c.found_source ?? "",
+                      }}
+                    />
+                  )}
+                />
               </div>
             ) : (
               <p className="mt-2 text-sm text-muted-foreground">Chưa có người liên hệ nào.</p>
@@ -178,6 +211,7 @@ export default async function CompanyDetailPage({
                 <div className="mt-2 overflow-x-auto opacity-80">
                   <ContactTable
                     contacts={inactiveContacts}
+                    showStatus={false}
                     renderActions={(c) => (
                       <HardDeleteContactButton
                         companyId={company.company_id}

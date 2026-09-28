@@ -2,9 +2,9 @@
 // Tương đương crawler_client/contacts.py bên Flask.
 //
 // Đã làm: list theo company (bảng read-only ở /companies/[companyId]),
-// list gộp toàn hệ thống (/contacts, Nhóm 2 Phần 2 mục 1), hard-delete
-// (Phần 2 mục 6). CHƯA làm: create/update/status/assign/xoá mềm và
-// <ContactForm> — Phần 2 mục 2-5.
+// list gộp toàn hệ thống (/contacts, Nhóm 2 Phần 2 mục 1), tạo/sửa
+// (Phần 2 mục 2, <ContactForm>), hard-delete (Phần 2 mục 6). CHƯA làm:
+// đổi status/assign tại chỗ và xoá mềm — Phần 2 mục 3-5.
 //
 // TOÀN BỘ route /companies/{id}/contacts yêu cầu require_role("ss_team")
 // ở backend (thông tin liên hệ nhạy cảm — email/SĐT cá nhân, khác GET
@@ -14,6 +14,8 @@ import { callAuthed, ApiError } from "./client";
 import type { components } from "./types";
 
 export type CompanyContactOut = components["schemas"]["CompanyContactOut"];
+type CompanyContactCreate = components["schemas"]["CompanyContactCreate"];
+type CompanyContactUpdate = components["schemas"]["CompanyContactUpdate"];
 /** Như CompanyContactOut nhưng kèm `company_name` — response của GET
  *  /contacts (danh sách gộp toàn hệ thống, Nhóm 2 Phần 2 mục 1). */
 export type CompanyContactWithCompanyOut = components["schemas"]["CompanyContactWithCompanyOut"];
@@ -98,4 +100,70 @@ export async function listAllContacts(filters: ContactListFilters = {}): Promise
   if (filters.q) params.set("search", filters.q);
   const qs = params.toString();
   return callAuthed<CompanyContactWithCompanyOut[]>(qs ? `/contacts?${qs}` : "/contacts");
+}
+
+// --- Phần 2, mục 2: tạo/sửa contact (<ContactForm>).
+
+/** Field nhập tay của <ContactForm> (camelCase, khớp cách company/job
+ *  input đã làm) — map sang snake_case của backend ở createContact()/
+ *  updateContact() bên dưới. */
+export interface ContactInput {
+  contactName: string;
+  title: string;
+  email: string;
+  contactLink: string;
+  phone: string;
+  source: string;
+}
+
+/**
+ * POST /companies/{company_id}/contacts — khớp create_contact() bên Flask:
+ * field trống -> null (không gửi chuỗi rỗng), note TUỲ CHỌN (khác sửa/xoá).
+ * assigned_ss_user không có ô nhập ở form (Flask cũng vậy) — gán sau qua
+ * cell "Phụ trách" (mục 3).
+ */
+export async function createContact(companyId: string, input: ContactInput, note?: string): Promise<CompanyContactOut> {
+  const payload: CompanyContactCreate = {
+    contact_name: input.contactName.trim(),
+    job_title: input.title.trim() || null,
+    work_email: input.email.trim() || null,
+    social_link: input.contactLink.trim() || null,
+    phone_number: input.phone.trim() || null,
+    found_source: input.source.trim() || null,
+    note: note?.trim() || null,
+  };
+  return callAuthed<CompanyContactOut>(`/companies/${companyId}/contacts`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+/**
+ * PATCH /companies/{company_id}/contacts/{contact_id}. Backend chỉ ghi đè
+ * field KHÁC null ("không gửi/null = giữ nguyên") nên field nào để trống ->
+ * gửi null, KHÔNG gửi "" (khớp update_contact() bên Flask; hệ quả: chưa xoá
+ * trắng được 1 field đã có giá trị — hạn chế của backend, không phải của FE).
+ *
+ * note BẮT BUỘC nếu có field thật sự đổi giá trị (422 nếu thiếu) — nơi gọi
+ * (<ContactForm>) tự so sánh với giá trị gốc để chỉ đòi note khi cần.
+ */
+export async function updateContact(
+  companyId: string,
+  contactId: string,
+  input: ContactInput,
+  note?: string,
+): Promise<CompanyContactOut> {
+  const payload: CompanyContactUpdate = {
+    contact_name: input.contactName.trim() || null,
+    job_title: input.title.trim() || null,
+    work_email: input.email.trim() || null,
+    social_link: input.contactLink.trim() || null,
+    phone_number: input.phone.trim() || null,
+    found_source: input.source.trim() || null,
+    note: note?.trim() || null,
+  };
+  return callAuthed<CompanyContactOut>(`/companies/${companyId}/contacts/${contactId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
 }

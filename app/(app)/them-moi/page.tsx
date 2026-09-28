@@ -5,19 +5,21 @@
 // Phạm vi ROUND 4 (đã chốt với user trước khi code):
 //   - Tab Job: LÀM THẬT — <JobForm mode="create"> (Round 3) + gọi
 //     createJobAction() (viết sẵn từ Round 3, giờ mới thật sự gắn UI).
-//   - Tab Công ty / Người liên hệ: CHƯA làm — <ComingSoonPanel>, chờ
+//   - Tab Công ty / Người liên hệ: lúc đó CHƯA làm (panel tạm), chờ
 //     <CompanyForm> đầy đủ + luồng tạo contact ở Nhóm 2 (user chọn
 //     "chờ đi, làm đúng quy trình" / "chờ, th ko làm trước plan", không
 //     tự ý đi trước plan dù có thể dựng tạm bằng field rút gọn).
 //
-// Nhóm 2, Phần 1 (round này): tab "Công ty" chuyển sang LÀM THẬT —
-// <CompanyForm mode="create"> (components/company-form.tsx) + gọi
-// createCompanyAction() — quyết định đã chốt với user: gắn luôn trong
-// Phần 1, không để riêng. Tab "Người liên hệ" VẪN <ComingSoonPanel> —
-// thuộc Phần 2 (ContactForm), chưa tới lượt.
+// Nhóm 2, Phần 1: tab "Công ty" LÀM THẬT — <CompanyForm mode="create">
+// (components/company-form.tsx) + createCompanyAction() — quyết định đã
+// chốt với user: gắn luôn trong Phần 1, không để riêng.
+//
+// Nhóm 2, Phần 2 mục 2: tab "Người liên hệ" LÀM THẬT — <ContactForm
+// mode="create"> (components/contact-form.tsx) + createContactAction().
+// <ComingSoonPanel> không còn tab nào dùng nên đã xoá.
 //
 // Company list load ĐÚNG 1 LẦN ở đây (Server Component cha), dùng
-// chung cho tab Job (và sau này cả tab Người liên hệ khi làm ở Phần 2)
+// chung cho tab Job và tab Người liên hệ
 // — đúng lý do _add_hub_context() tồn tại riêng bên Flask (xem docstring
 // blueprints/add_hub.py): "company list cần load ĐÚNG 1 LẦN, dùng chung
 // cho cả tab job và tab contact... để KHÔNG ai vô tình gọi lại 2-3 lần".
@@ -34,8 +36,8 @@ import { listAllCompanies } from "@/lib/api/companies";
 import { getLevelCodes, getProvinceNames } from "@/lib/api/enums";
 import { JobForm } from "@/components/job-form";
 import { CompanyForm } from "@/components/company-form";
+import { ContactForm } from "@/components/contact-form";
 import { AddHubTabs, type AddHubTab } from "./add-hub-tabs";
-import { ComingSoonPanel } from "./coming-soon-panel";
 
 const VALID_TABS: AddHubTab[] = ["job", "company", "contact"];
 
@@ -74,7 +76,7 @@ export default async function AddHubPage({
         activeTab={activeTab}
         jobPanel={<JobForm mode="create" companies={companies} levels={levels} provinces={provinces} />}
         companyPanel={<CompanyForm mode="create" />}
-        contactPanel={<ComingSoonPanel label="người liên hệ" />}
+        contactPanel={<ContactForm mode="create" companies={companies} />}
       />
     </div>
   );

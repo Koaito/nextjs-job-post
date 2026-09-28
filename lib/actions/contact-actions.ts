@@ -1,15 +1,22 @@
 "use server";
 
 // lib/actions/contact-actions.ts
-// Phần 2, mục 6 (chat243.txt/chat244.txt) — CHỈ có hardDeleteContactAction()
-// cho nút "Xoá hẳn" ở /companies/[companyId] (khối "Đã xoá"). CHƯA làm:
-// createContact/updateContact/assignContact/deleteContact (soft) — thuộc
-// Phần 2 mục 1+2 (<ContactForm>, /contacts), đang làm ở phiên khác, không
-// đụng vào đây để tránh trùng lặp/conflict khi merge.
+// Phần 2: mục 2 (createContactAction/updateContactAction cho <ContactForm>)
+// và mục 6 (hardDeleteContactAction, nút "Xoá hẳn" ở /companies/[companyId]).
+// CHƯA làm: assignContact/deleteContact (soft) và đổi status tại chỗ —
+// Phần 2 mục 3-5.
 
 import { revalidatePath } from "next/cache";
 import { ApiError } from "@/lib/api/client";
-import { hardDeleteContact, isContactNotFound } from "@/lib/api/contacts";
+import { createCompany } from "@/lib/api/companies";
+import {
+  createContact,
+  updateContact,
+  hardDeleteContact,
+  isContactNotFound,
+  type ContactInput,
+} from "@/lib/api/contacts";
+import type { CompanyFieldValue } from "@/components/company-combobox";
 
 export interface ContactNoteActionResult {
   ok: boolean;
@@ -39,5 +46,102 @@ export async function hardDeleteContactAction(
     }
     const message = err instanceof ApiError ? err.message : "Không thể xoá hẳn người liên hệ, thử lại sau.";
     return { ok: false, message };
+  }
+}
+
+export interface ContactFormActionResult {
+  ok: boolean;
+  errorMessage?: string;
+  /** Lỗi theo từng field — <ContactForm> tô đỏ tại chỗ + giữ nguyên input. */
+  fieldErrors?: Record<string, string>;
+  companyId?: string;
+  /** true = công ty vừa "tạo mới" thật ra đã tồn tại (trùng tax_id/tên) —
+   *  nơi gọi phải báo "đã tìm thấy công ty trùng", không nói "đã tạo". */
+  companyWasExisting?: boolean;
+}
+
+function validateContactForm(input: ContactInput): Record<string, string> {
+  const errors: Record<string, string> = {};
+  if (!input.contactName.trim()) errors.contactName = "Vui lòng nhập tên người liên hệ.";
+  return errors;
+}
+
+/**
+ * POST /companies/{company_id}/contacts — dùng bởi <ContactForm mode="create">
+ * (tab "Người liên hệ" ở /them-moi). Khớp contacts.add_any() bên Flask:
+ * company bắt buộc ("Cần chọn công ty."). Khác Flask ở chỗ combobox có chế
+ * độ "＋ Tạo công ty mới…" (plan Nhóm 1) -> resolve company TRƯỚC (gọi
+ * createCompany(), idempotent theo tax_id/tên — cùng cách createJobAction()),
+ * rồi mới tạo contact. Nếu bước tạo contact lỗi thì company đã tạo vẫn còn
+ * (vô hại: bấm Lưu lại sẽ khớp đúng công ty đó, không tạo trùng).
+ */
+export async function createContactAction(
+  companyField: CompanyFieldValue,
+  input: ContactInput,
+  activityNote?: string,
+): Promise<ContactFormActionResult> {
+  const fieldErrors = validateContactForm(input);
+  if (companyField.mode === "existing" && !companyField.companyId) {
+    fieldErrors.company = "Vui lòng chọn công ty.";
+  }
+  if (companyField.mode === "new" && !companyField.companyName.trim()) {
+    fieldErrors.company = "Vui lòng nhập tên công ty.";
+  }
+  if (Object.keys(fieldErrors).length > 0) {
+    return { ok: false, fieldErrors, errorMessage: "Vui lòng kiểm tra lại các trường còn thiếu." };
+  }
+
+  try {
+    let companyId: string;
+    let companyWasExisting = false;
+    if (companyField.mode === "new") {
+      const created = await createCompany({
+        companyName: companyField.companyName,
+        taxId: companyField.taxId,
+        website: companyField.website,
+        industry: companyField.industry,
+        city: companyField.city,
+      });
+      companyId = created.company.id;
+      companyWasExisting = created.wasExisting;
+      revalidatePath("/companies");
+    } else {
+      companyId = companyField.companyId;
+    }
+
+    await createContact(companyId, input, activityNote);
+    revalidatePath("/contacts");
+    revalidatePath(`/companies/${companyId}`);
+    return { ok: true, companyId, companyWasExisting };
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : "Không thể thêm người liên hệ, thử lại sau.";
+    return { ok: false, errorMessage: message };
+  }
+}
+
+/**
+ * PATCH /companies/{company_id}/contacts/{contact_id} — dùng bởi
+ * <ContactForm mode="edit">. note BẮT BUỘC khi có field thật sự đổi:
+ * <ContactForm> đã tự chặn ở client (chỉ đòi khi khác giá trị gốc), backend
+ * vẫn là lớp chặn cuối (422) — message backend được trả nguyên ra form.
+ */
+export async function updateContactAction(
+  companyId: string,
+  contactId: string,
+  input: ContactInput,
+  activityNote: string,
+): Promise<ContactFormActionResult> {
+  const fieldErrors = validateContactForm(input);
+  if (Object.keys(fieldErrors).length > 0) {
+    return { ok: false, fieldErrors, errorMessage: "Vui lòng kiểm tra lại các trường còn thiếu." };
+  }
+  try {
+    await updateContact(companyId, contactId, input, activityNote);
+    revalidatePath("/contacts");
+    revalidatePath(`/companies/${companyId}`);
+    return { ok: true, companyId };
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : "Không thể cập nhật người liên hệ, thử lại sau.";
+    return { ok: false, errorMessage: message };
   }
 }
