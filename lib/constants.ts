@@ -171,3 +171,11 @@ export const CONTACT_STATUS_LABELS: Record<string, string> = {
   RESPONDED: "Đã phản hồi",
   IN_PARTNERSHIP: "Đang hợp tác",
 };
+
+// Mã trạng thái contact hợp lệ (khớp _VALID_CONTACT_STATUS ở
+// api/routers/contacts.py) — dùng làm `value` của <select> lọc ở
+// /contacts (Nhóm 2, Phần 2). Theo nguyên tắc "value gửi API là key
+// backend, không phải nhãn tiếng Việt" (plan, Nhóm 3 — dropdown enum):
+// KHÁC Flask (gửi nhãn tiếng Việt rồi tra CONTACT_STATUS_MAP_REV), ở đây
+// gửi thẳng mã, tra nhãn hiển thị qua CONTACT_STATUS_LABELS ở trên.
+export const CONTACT_STATUS_CODES = ["UNCONTACTED", "EMAIL_SENT", "RESPONDED", "IN_PARTNERSHIP"] as const;

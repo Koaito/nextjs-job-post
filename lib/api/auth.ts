@@ -7,6 +7,7 @@
 
 import type { BackendUser, TokenPair } from "@/lib/api/types-manual";
 import { ApiError, callAuthed } from "@/lib/api/client";
+import type { components } from "@/lib/api/types";
 
 const BASE_URL = process.env.CRAWLER_API_URL;
 const API_KEY = process.env.CRAWLER_API_KEY;
@@ -107,3 +108,18 @@ export const changePassword = (data: { old_password?: string; new_password: stri
     method: "POST",
     body: JSON.stringify(data),
   });
+
+/**
+ * GET /auth/users — toàn bộ tài khoản, ss_team trở lên gọi được. Trả về
+ * CHỈ nhân sự team SS (role ss_team/admin), khớp `staff_members` ở
+ * blueprints/contacts.py bên Flask — dùng để map `assigned_ss_user` ->
+ * tên người phụ trách (và sau này làm dropdown gán phụ trách, Phần 2
+ * mục 3). Học viên (role "user") bị lọc bỏ: backend cũng không cho gán
+ * contact cho role này (CONTACT_ASSIGNED_USER_ROLE_INVALID).
+ */
+export type StaffUser = components["schemas"]["UserOut"];
+
+export async function listStaffUsers(): Promise<StaffUser[]> {
+  const all = await callAuthed<StaffUser[]>("/auth/users");
+  return all.filter((u) => u.role === "ss_team" || u.role === "admin");
+}

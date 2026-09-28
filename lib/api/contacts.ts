@@ -1,10 +1,10 @@
 // lib/api/contacts.ts
-// Tương đương crawler_client/contacts.py bên Flask — CHỈ làm phần ĐỌC
-// (list theo company) cần cho bảng contact READ-ONLY ở
-// /companies/[companyId] (Nhóm 2, Phần 1 — quyết định đã chốt với user:
-// "Hiện bảng contact read-only, không sửa/xoá/assign"). CHƯA làm: create/
-// update/status/assign/delete/hard-delete, trang /contacts (danh sách gộp
-// toàn hệ thống), <ContactForm> — thuộc Nhóm 2, Phần 2 (chưa tới lượt).
+// Tương đương crawler_client/contacts.py bên Flask.
+//
+// Đã làm: list theo company (bảng read-only ở /companies/[companyId]),
+// list gộp toàn hệ thống (/contacts, Nhóm 2 Phần 2 mục 1), hard-delete
+// (Phần 2 mục 6). CHƯA làm: create/update/status/assign/xoá mềm và
+// <ContactForm> — Phần 2 mục 2-5.
 //
 // TOÀN BỘ route /companies/{id}/contacts yêu cầu require_role("ss_team")
 // ở backend (thông tin liên hệ nhạy cảm — email/SĐT cá nhân, khác GET
@@ -14,6 +14,9 @@ import { callAuthed, ApiError } from "./client";
 import type { components } from "./types";
 
 export type CompanyContactOut = components["schemas"]["CompanyContactOut"];
+/** Như CompanyContactOut nhưng kèm `company_name` — response của GET
+ *  /contacts (danh sách gộp toàn hệ thống, Nhóm 2 Phần 2 mục 1). */
+export type CompanyContactWithCompanyOut = components["schemas"]["CompanyContactWithCompanyOut"];
 
 /**
  * GET /companies/{company_id}/contacts?include_inactive=true — LUÔN lấy
@@ -63,4 +66,36 @@ export async function hardDeleteContact(companyId: string, contactId: string, no
  *  lỗi khó hiểu cho tình huống vô hại này. */
 export function isContactNotFound(err: unknown): boolean {
   return err instanceof ApiError && err.status === 404;
+}
+
+// --- Phần 2, mục 1: /contacts — danh sách gộp toàn hệ thống.
+
+export interface ContactListFilters {
+  /** Tìm theo tên contact (khớp 1 phần, không phân biệt hoa/thường). */
+  q?: string;
+  /** 1 trong CONTACT_STATUS_CODES (mã tiếng Anh, KHÔNG phải nhãn Việt). */
+  status?: string;
+  company_id?: string;
+}
+
+/**
+ * GET /contacts — contact gộp mọi công ty, kèm company_name. Khớp
+ * list_all_contacts() bên Flask: mặc định CHỈ contact đang active
+ * (include_inactive=false — trang này là view "đang cần làm việc", xem
+ * lại contact đã xoá mềm vào /companies/[companyId]). Backend KHÔNG
+ * phân trang route này (trả thẳng mảng, không có `total`) — giống Flask.
+ *
+ * created_by/assigned_ss_user (backend có hỗ trợ) chưa dùng ở đây: chỉ
+ * phục vụ /staff-activity/[id] (Nhóm 3).
+ *
+ * Yêu cầu role ss_team -> callAuthed. no-store đã là mặc định của
+ * callAuthed (plan Nhóm 2: /contacts KHÔNG cache giữa các lần lọc).
+ */
+export async function listAllContacts(filters: ContactListFilters = {}): Promise<CompanyContactWithCompanyOut[]> {
+  const params = new URLSearchParams();
+  if (filters.status) params.set("contact_status", filters.status);
+  if (filters.company_id) params.set("company_id", filters.company_id);
+  if (filters.q) params.set("search", filters.q);
+  const qs = params.toString();
+  return callAuthed<CompanyContactWithCompanyOut[]>(qs ? `/contacts?${qs}` : "/contacts");
 }
