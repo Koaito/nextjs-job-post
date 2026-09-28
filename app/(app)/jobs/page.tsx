@@ -18,10 +18,14 @@ import { getLevelCodes, getProvinceNames } from "@/lib/api/enums";
 import { listJobs, listJobsCursor, toJobCardData } from "@/lib/api/jobs";
 import { INDUSTRIES, JOBS_PER_PAGE, INDUSTRY_BADGE_STYLES, INDUSTRY_BADGE_FALLBACK } from "@/lib/constants";
 import { JobFilterBar } from "./filter-bar";
-import { JobCard } from "./job-card";
+import { JOB_GRID_CLASS, JobCard } from "./job-card";
 import { Pagination } from "./pagination";
 import { ViewToggle } from "./view-toggle";
 import { InfiniteJobList } from "./infinite-job-list";
+
+// `.btn.btn-primary` (03-layout.css): nền cam, chữ tối, 14px/600.
+const BTN_PRIMARY =
+  "inline-block rounded-[9px] border border-transparent bg-primary px-[18px] py-2.5 text-sm font-semibold whitespace-nowrap text-primary-foreground hover:bg-[#E64D28]";
 
 export const metadata = {
   title: "Việc làm — MindX Career Hub",
@@ -114,25 +118,29 @@ export default async function JobsPage({
   // <SavedJobsProvider>, <SaveJobButton> tự đọc — không gọi trùng
   // GET /me/saved-jobs mỗi lần đổi trang/filter.
 
+  // Khoảng cách giữa các khối KHÔNG dùng `space-y-*` nữa: Flask đặt margin
+  // riêng cho từng khối (03-layout.css / 04-job-cards.css) và có chỗ
+  // margin-top ÂM (.list-hint) — dùng margin tường minh + để margin
+  // collapsing của block layout tự gộp giống hệt trình duyệt bên Flask.
   return (
-    <div className="space-y-6">
-      <header className="flex flex-wrap items-start justify-between gap-4">
+    <div>
+      {/* .page-head */}
+      <header className="mb-[26px] flex flex-wrap items-end justify-between gap-6">
         <div>
-          <span className="text-sm text-muted-foreground">Career Hub / Việc làm</span>
-          <h1 className="font-heading text-3xl font-semibold">
+          <span className="font-mono text-xs uppercase tracking-[0.06em] text-primary">
+            Career Hub / Việc làm
+          </span>
+          <h1 className="mt-2 mb-1.5 font-heading text-[30px] font-bold tracking-[-0.01em]">
             Job Intern &amp; Fresher cho học viên MindX
           </h1>
-          <p className="mt-1 max-w-2xl text-muted-foreground">
+          <p className="m-0 max-w-[640px] text-[var(--brand-ink-soft)]">
             Tổng hợp job Code, Data Analysis, Business Analysis từ TopCV,
             LinkedIn, ITviec, VietnamWorks, website công ty và các nguồn công
             khai khác.
           </p>
         </div>
         {user?.is_staff && (
-          <Link
-            href="/them-moi?tab=job"
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-          >
+          <Link href="/them-moi?tab=job" className={BTN_PRIMARY}>
             ＋ Thêm job mới
           </Link>
         )}
@@ -142,33 +150,36 @@ export default async function JobsPage({
 
       <ViewToggle currentParams={currentParams} view={view} />
 
-      {/* Chế độ "page" có page/per_page để tính khoảng "Hiển thị X–Y / Z"
-          — chế độ "infinite" KHÔNG có 2 biến này (không phân trang cố
-          định, số dòng thực tế tăng dần theo mỗi lần "Tải thêm"), nên
-          chỉ hiện tổng số job phù hợp, không hiện khoảng X–Y (khớp
-          index.html Flask, khối `{% if jobs and view != 'infinite' %}`). */}
-      <p className="text-sm text-muted-foreground">
+      {/* .result-count. Chế độ "page" có page/per_page để tính khoảng
+          "Hiển thị X–Y / Z" — chế độ "infinite" KHÔNG có 2 biến này (không
+          phân trang cố định, số dòng thực tế tăng dần theo mỗi lần "Tải
+          thêm"), nên chỉ hiện tổng số job phù hợp, không hiện khoảng X–Y
+          (khớp index.html Flask, khối `{% if jobs and view != 'infinite' %}`). */}
+      <p className="mx-0.5 mt-2 mb-5 font-mono text-[12.5px] text-muted-foreground">
         {jobs.length > 0 && view !== "infinite"
           ? `Hiển thị ${from}–${to} / ${totalJobs} job phù hợp`
           : `${totalJobs} job phù hợp`}
       </p>
 
+      {/* .list-hint — margin-top âm kéo sát lên dưới dòng đếm, như Flask. */}
       {jobs.length > 0 && (
-        <p className="text-sm">
+        <p className="mx-0.5 -mt-2.5 mb-5 rounded-lg border border-[#BFE5DD] bg-[var(--brand-teal-soft)] px-3 py-2 text-[12.5px] text-[var(--brand-ink-soft)]">
           💡 Bấm vào <strong>tên vị trí</strong> của mỗi job để xem chi tiết
           đầy đủ và nộp CV ứng tuyển ngay trong hệ thống.
         </p>
       )}
 
+      {/* .industry-legend */}
       {jobs.length > 0 && (
-        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-          <span>Màu ngành:</span>
+        <div className="mb-4 flex flex-wrap items-center gap-x-3.5 gap-y-2 rounded-[var(--radius)] border border-border bg-card px-3.5 py-2.5 text-xs text-[var(--brand-ink-soft)]">
+          <span className="mr-0.5 font-semibold text-foreground">Màu ngành:</span>
           {INDUSTRIES.map((i) => {
             const style = INDUSTRY_BADGE_STYLES[i] ?? INDUSTRY_BADGE_FALLBACK;
             return (
-              <span key={i} className="flex items-center gap-1">
+              <span key={i} className="inline-flex items-center gap-1.5">
+                {/* .industry-legend-swatch: ô vuông 10x10 bo 3px */}
                 <span
-                  className="inline-block h-2.5 w-2.5 rounded-full"
+                  className="size-2.5 shrink-0 rounded-[3px]"
                   style={{ background: style.fg }}
                 />
                 {i}
@@ -188,7 +199,7 @@ export default async function JobsPage({
           />
         ) : (
           <>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className={JOB_GRID_CLASS}>
               {jobs.map((job) => (
                 <JobCard key={job.id} job={job} isAuthenticated={!!user} />
               ))}
@@ -202,13 +213,11 @@ export default async function JobsPage({
           </>
         )
       ) : (
-        <div className="rounded-md border border-dashed p-8 text-center">
-          <p className="mb-4 text-muted-foreground">Chưa có job nào khớp bộ lọc.</p>
+        /* .empty-state */
+        <div className="rounded-[var(--radius)] border border-dashed border-border bg-card p-10 text-center text-[var(--brand-ink-soft)]">
+          <p className="mb-4">Chưa có job nào khớp bộ lọc.</p>
           {user?.is_staff && (
-            <Link
-              href="/them-moi?tab=job"
-              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-            >
+            <Link href="/them-moi?tab=job" className={BTN_PRIMARY}>
               Thêm job đầu tiên
             </Link>
           )}

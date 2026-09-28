@@ -26,21 +26,29 @@ export function ViewToggle({
   infiniteParams.set("view", "infinite");
   const infiniteHref = `/jobs?${infiniteParams.toString()}`;
 
-  const activeClass = "bg-primary text-primary-foreground";
-  const inactiveClass = "border text-muted-foreground hover:text-foreground";
+  // `.view-toggle-btn` (10-pagination-responsive.css): 13.5px/600, padding
+  // 8px 14px, viền --border, nền trắng; nút đầu bo trái, nút cuối bo phải
+  // và bỏ viền trái; đang chọn = nền --ink, chữ trắng. Bản trước dùng
+  // pill bo tròn nền cam nên lệch hẳn.
+  const base =
+    "border px-3.5 py-2 text-[13.5px] font-semibold whitespace-nowrap hover:border-foreground";
+  const activeClass = "border-foreground bg-foreground text-card";
+  const inactiveClass = "border-border bg-card text-foreground";
 
   return (
-    <div className="flex flex-wrap items-center gap-2 text-sm">
-      <span className="text-muted-foreground">Chế độ xem:</span>
+    <div className="mt-1 mb-[18px] inline-flex items-center gap-2.5">
+      <span className="text-[13.5px] whitespace-nowrap text-[var(--brand-ink-soft)]">
+        Chế độ xem:
+      </span>
       <Link
         href={pageHref}
-        className={`rounded-full px-3 py-1 ${view !== "infinite" ? activeClass : inactiveClass}`}
+        className={`${base} rounded-l-lg ${view !== "infinite" ? activeClass : inactiveClass}`}
       >
         Phân trang
       </Link>
       <Link
         href={infiniteHref}
-        className={`rounded-full px-3 py-1 ${view === "infinite" ? activeClass : inactiveClass}`}
+        className={`${base} rounded-r-lg border-l-0 ${view === "infinite" ? activeClass : inactiveClass}`}
       >
         Cuộn liên tục
       </Link>

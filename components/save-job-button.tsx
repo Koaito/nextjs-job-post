@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "cn";
 import { useSavedJobs } from "@/components/saved-jobs-provider";
+import { SAVE_BTN_CLASS, SAVE_BTN_SAVED_CLASS } from "@/components/save-btn-style";
 import { toggleSaveJobAction } from "@/lib/actions/job-actions";
 
 interface SaveJobButtonProps {
@@ -80,20 +81,19 @@ export function SaveJobButton({
     );
   }
 
-  // variant === "card": chỉ đổi icon/label, không đổi màu nút primary —
-  // khớp _job_card.html (nút nhỏ góc card, không phải CTA chính).
+  // variant === "card": nút chữ nhỏ trong hàng thao tác cuối card, nằm
+  // cạnh "Xem JD gốc ↗" — đúng `.save-btn` của _job_card.html (chỉ đổi
+  // nhãn 🔖 Lưu job <-> 🔖 Đã lưu + tô cam khi đã lưu, không phải CTA
+  // chính). Bản trước vẽ icon-only ở góc trên card nên lệch Flask.
   return (
-    <Button
+    <button
       type="button"
-      variant="ghost"
-      size="icon-sm"
       disabled={isPending}
       onClick={handleClick}
-      title={disabledReason ?? label}
-      aria-label={label}
-      className={cn(saved && "text-primary")}
+      title={disabledReason}
+      className={cn(SAVE_BTN_CLASS, saved && SAVE_BTN_SAVED_CLASS)}
     >
-      <Icon className="size-4" />
-    </Button>
+      🔖 {label}
+    </button>
   );
 }

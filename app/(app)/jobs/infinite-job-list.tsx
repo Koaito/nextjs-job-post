@@ -15,7 +15,7 @@
 // phần fetch/state bên dưới.
 
 import { useState } from "react";
-import { JobCard } from "./job-card";
+import { JOB_GRID_CLASS, JobCard } from "./job-card";
 import type { JobCardData, JobFilters } from "@/lib/api/jobs";
 
 export function InfiniteJobList({
@@ -71,26 +71,28 @@ export function InfiniteJobList({
 
   return (
     <>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className={JOB_GRID_CLASS}>
         {jobs.map((job) => (
           <JobCard key={job.id} job={job} isAuthenticated={isAuthenticated} />
         ))}
       </div>
 
-      <div className="flex flex-col items-center gap-2 pt-2">
+      {/* .load-more-wrap — cùng khoảng cách trên với .pagination để 2 chế độ
+          có "chiều cao đáy trang" gần bằng nhau khi chuyển qua lại. */}
+      <div className="mt-7 flex flex-col items-center gap-2 border-t border-border pt-[18px]">
         {cursor ? (
           <button
             type="button"
             onClick={loadMore}
             disabled={loading}
-            className="rounded-md border px-4 py-2 text-sm font-medium disabled:opacity-60"
+            className="min-w-40 cursor-pointer rounded-[9px] border border-border bg-card px-[18px] py-2.5 text-sm font-semibold whitespace-nowrap text-foreground hover:border-foreground disabled:cursor-default disabled:opacity-60"
           >
             {loading ? "Đang tải..." : "Tải thêm"}
           </button>
         ) : (
-          <p className="text-sm text-muted-foreground">Đã hết job phù hợp.</p>
+          <p className="m-0 text-[13.5px] text-muted-foreground">Đã hết job phù hợp.</p>
         )}
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p className="m-0 text-[13px] text-[#b91c1c]">{error}</p>}
       </div>
     </>
   );

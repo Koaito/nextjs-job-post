@@ -71,13 +71,29 @@ export default async function AppLayout({
       {/* key theo user: đổi tài khoản trên cùng tab thì Provider mount lại
           với danh sách đã lưu của người mới, không giữ state người cũ. */}
       <SavedJobsProvider key={user?.ss_user_id ?? "guest"} initialSavedJobIds={savedJobIds}>
-        <SidebarProvider defaultOpen={defaultOpen}>
+        {/* Bề rộng khớp Flask: --sidebar-width 248px, thu gọn 76px (00-tokens.css). */}
+        <SidebarProvider
+          defaultOpen={defaultOpen}
+          style={
+            {
+              "--sidebar-width": "248px",
+              "--sidebar-width-icon": "76px",
+            } as React.CSSProperties
+          }
+        >
           <AppSidebar viewer={viewer} />
           <SidebarInset className="min-w-0">
-            <header className="sticky top-0 z-10 flex h-12 items-center gap-2 border-b bg-background px-4">
+            {/* Flask không có thanh trên cùng ở desktop — nút "« Thu gọn"
+                nằm TRONG sidebar (xem app-sidebar.tsx). Thanh này chỉ còn
+                trên màn hẹp, nơi sidebar là Sheet cần 1 nút để mở. */}
+            <header className="sticky top-0 z-10 flex h-12 items-center gap-2 border-b bg-background px-4 md:hidden">
               <SidebarTrigger />
             </header>
-            <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</div>
+            {/* .content (03-layout.css): padding 40px 40px 64px,
+                max-width 1800px, canh giữa; màn hẹp (<900px) padding 24px. */}
+            <div className="mx-auto w-full max-w-[1800px] flex-1 px-6 pt-6 pb-16 md:px-10 md:pt-10">
+              {children}
+            </div>
           </SidebarInset>
         </SidebarProvider>
       </SavedJobsProvider>

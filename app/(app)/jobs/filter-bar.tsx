@@ -19,6 +19,11 @@ import { withCurrentOption } from "@/lib/utils";
 
 const DEBOUNCE_MS = 300;
 
+// `.filter-bar input, .filter-bar select` (03-layout.css): padding 9px 11px,
+// bo 8px, viền --border, nền #FBFCFB, chữ 13.5px.
+const CONTROL_CLASS =
+  "rounded-lg border border-border bg-[#FBFCFB] px-[11px] py-[9px] text-[13.5px] text-foreground";
+
 // `provinces` lấy từ GET /enums (lib/api/enums.ts::getProvinceNames) — backend
 // lọc `province` khớp TUYỆT ĐỐI với tên trong bảng provinces, nên dropdown
 // chỉ được chứa đúng tên backend biết (trước đây có "TP.HCM"/"Hybrid" tự
@@ -62,19 +67,22 @@ export function JobFilterBar({ levels, provinces }: { levels: string[]; province
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    // `.filter-bar`: thẻ trắng có viền, gap 10px, padding 14px, mb 10px.
+    // Flask có thêm nút "Lọc" (submit form) — bỏ có chủ đích vì đây là
+    // search-as-you-type, dropdown áp dụng ngay (plan dòng 969).
+    <div className="mb-2.5 flex flex-wrap gap-2.5 rounded-[var(--radius)] border border-border bg-card p-3.5">
       <input
         type="text"
         placeholder="Tìm theo vị trí, công ty, kỹ năng…"
         value={q}
         onChange={(e) => handleQChange(e.target.value)}
-        className="min-w-[220px] flex-1 rounded-md border px-3 py-2 text-sm"
+        className={`min-w-0 flex-[1_1_220px] ${CONTROL_CLASS}`}
       />
 
       <select
         value={industry}
         onChange={(e) => updateParams({ industry: e.target.value })}
-        className="rounded-md border px-3 py-2 text-sm"
+        className={CONTROL_CLASS}
       >
         <option value="">Tất cả ngành</option>
         {INDUSTRIES.map((i) => (
@@ -87,7 +95,7 @@ export function JobFilterBar({ levels, provinces }: { levels: string[]; province
       <select
         value={level}
         onChange={(e) => updateParams({ level: e.target.value })}
-        className="rounded-md border px-3 py-2 text-sm"
+        className={CONTROL_CLASS}
       >
         <option value="">Mọi level</option>
         {levels.map((l) => (
@@ -100,7 +108,7 @@ export function JobFilterBar({ levels, provinces }: { levels: string[]; province
       <select
         value={location}
         onChange={(e) => updateParams({ location: e.target.value })}
-        className="rounded-md border px-3 py-2 text-sm"
+        className={CONTROL_CLASS}
       >
         <option value="">Mọi địa điểm</option>
         {/* URL cũ/bookmark có location không còn hợp lệ vẫn hiện được ở đây
@@ -115,7 +123,7 @@ export function JobFilterBar({ levels, provinces }: { levels: string[]; province
       <select
         value={status}
         onChange={(e) => updateParams({ status: e.target.value })}
-        className="rounded-md border px-3 py-2 text-sm"
+        className={CONTROL_CLASS}
       >
         {/* value="" = mặc định "Đang tuyển" (xem lib/api/jobs.ts), KHÔNG
             phải "mọi trạng thái" — khớp đúng _index_filters() bên Flask. */}
@@ -128,7 +136,7 @@ export function JobFilterBar({ levels, provinces }: { levels: string[]; province
         <button
           type="button"
           onClick={clearAll}
-          className="rounded-md px-3 py-2 text-sm underline"
+          className="inline-block cursor-pointer px-1.5 py-2.5 text-sm font-semibold whitespace-nowrap text-[var(--brand-ink-soft)] hover:text-primary"
         >
           Xóa lọc
         </button>

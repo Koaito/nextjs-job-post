@@ -55,6 +55,11 @@
   --card-min-w: 900px;
   --form-grid-gap-row: 14px;
   --form-grid-gap-col: 18px;
+  /* Flask ép `html { zoom: 0.9 }` (00-tokens.css, theo yêu cầu "giống hệt
+     zoom trình duyệt 90%"): toàn bộ px/font/khoảng cách co 10%. Không có
+     dòng này thì Next.js cùng số px vẫn to hơn Flask ~11% dù mọi giá trị
+     đã copy đúng. Muốn tắt: đặt lại 1 (không cần sửa chỗ nào khác). */
+  --zoom-scale: 0.9;
 }
 
 @theme inline {
@@ -114,7 +119,7 @@
      hiệu của Flask (KHÔNG phải shadcn --accent, xem giải thích ở đầu
      file). */
   --primary: var(--brand-accent);
-  --primary-foreground: #FFFFFF;
+  --primary-foreground: #16130E;
   --secondary: var(--brand-teal);
   --secondary-foreground: #FFFFFF;
   /* Flask không có riêng 1 "nền muted" tách khỏi --bg -> dùng lại --bg
@@ -144,7 +149,7 @@
   --sidebar: var(--brand-ink);
   --sidebar-foreground: var(--brand-sidebar-fg);
   --sidebar-primary: var(--brand-accent);
-  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-primary-foreground: #14150F;
   --sidebar-accent: var(--brand-sidebar-hover);
   --sidebar-accent-foreground: var(--brand-sidebar-fg);
   --sidebar-border: var(--brand-sidebar-border);
@@ -196,8 +201,26 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Flask: body { font-size: 15px; line-height: 1.5 } */
+    font-size: 15px;
+    line-height: 1.5;
   }
   html {
     @apply font-sans;
+    zoom: var(--zoom-scale);
   }
+}
+
+/* Bù zoom cho đơn vị svh — cùng lý do và cùng cách với Flask (xem
+   00-tokens.css, `.shell`/.sidebar { height: calc(100vh / var(--zoom-scale)) }):
+   `zoom` co box xuống SAU khi trình duyệt đã tính 100svh theo viewport
+   thật, nên sidebar/khung ngoài cao "100svh" chỉ phủ 90% màn hình, hụt
+   khoảng trắng ở đáy. Viết ngoài @layer để thắng class h-svh/min-h-svh
+   của shadcn Sidebar mà không phải sửa components/ui/sidebar.tsx (chạy
+   lại `shadcn add sidebar` sẽ không làm mất chỗ này). */
+[data-slot="sidebar-wrapper"] {
+  min-height: calc(100svh / var(--zoom-scale));
+}
+[data-slot="sidebar-container"] {
+  height: calc(100svh / var(--zoom-scale));
 }
