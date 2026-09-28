@@ -45,6 +45,25 @@ export async function requireUser(): Promise<BackendUser> {
   return user;
 }
 
+/**
+ * Route CHỈ dành cho học viên (role "user") — khớp `if current_user.is_staff:
+ * redirect(dashboard)` đầu mỗi route trong blueprints/my_stuff.py (saved_jobs,
+ * my_applications).
+ *
+ * Plan Nhóm 5: 1 tài khoản vừa được nâng từ học viên lên ss_team (còn dữ
+ * liệu saved_jobs/applications cũ) KHÔNG được xem lại các trang này dù gõ
+ * thẳng URL. Áp dụng nhất quán cho CẢ nhóm route "my stuff" bằng 1 helper
+ * duy nhất thay vì mỗi page tự check `is_staff` — đúng bài học plan nêu:
+ * thêm route mới vào nhóm mà quên check là lỗi dễ mắc nhất.
+ *
+ * Staff -> redirect /dashboard như Flask (trang /dashboard làm ở Nhóm 3).
+ */
+export async function requireStudent(): Promise<BackendUser> {
+  const user = await requireUser();
+  if (user.is_staff) redirect("/dashboard");
+  return user;
+}
+
 export async function requireStaff(): Promise<BackendUser> {
   const user = await requireUser();
   if (!user.is_staff) notFound(); // khớp hành vi Flask: 403 -> trang lỗi chung

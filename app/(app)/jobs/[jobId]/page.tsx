@@ -4,16 +4,18 @@
 // đầu file, chỉ đọc getCurrentUser() (không redirect) để tự rẽ nhánh
 // UI staff/học viên/khách, đúng cách jobs/page.tsx đã làm.
 //
-// CHƯA làm (Nhóm 5, xem comment trong apply-section.tsx): apply/
-// withdraw CV, already_applied, nút "Xem CV" của staff. Đã làm:
-// applicants/savers (staff), đổi trạng thái + đóng job (staff, note
-// tuỳ chọn), save/unsave job (học viên).
+// Nhóm 5, Đợt 5.3: học viên nộp CV / huỷ ứng tuyển ngay ở aside
+// (<ApplySection>), `alreadyApplied` tính bên dưới. CHƯA làm: nút "Xem CV"
+// của staff (GET /jobs/applications/{id}/cv-url). Đã làm: applicants/savers
+// (staff), đổi trạng thái + đóng job (staff, note tuỳ chọn), save/unsave job
+// (học viên).
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
 import { getJob, toJobDetailData } from "@/lib/api/jobs";
 import { listJobApplicants, listJobSavers } from "@/lib/api/applications";
+import { listMyApplications } from "@/lib/api/me";
 import { JobStatusPanel } from "./job-status-panel";
 import { ApplySection } from "./apply-section";
 
@@ -63,6 +65,16 @@ export default async function JobDetailPage({
     isStaff ? listJobApplicants(jobId).catch(() => []) : Promise.resolve(null),
     isStaff ? listJobSavers(jobId).catch(() => []) : Promise.resolve(null),
   ]);
+
+  // already_applied (khớp job_detail() bên Flask): CHỈ học viên đã đăng nhập
+  // mới cần biết; lỗi gọi API -> coi như chưa ứng tuyển (Flask try/except
+  // -> False) thay vì làm hỏng cả trang chi tiết job.
+  const alreadyApplied =
+    user && !isStaff
+      ? await listMyApplications()
+          .then((apps) => apps.some((a) => a.job_id === job.id))
+          .catch(() => false)
+      : false;
 
   return (
     <div className="space-y-6">
@@ -196,7 +208,13 @@ export default async function JobDetailPage({
               </section>
             </>
           ) : (
-            <ApplySection jobId={job.id} isAuthenticated={isAuthenticated} />
+            <ApplySection
+              jobId={job.id}
+              jobTitle={job.position}
+              companyName={job.company}
+              isAuthenticated={isAuthenticated}
+              alreadyApplied={alreadyApplied}
+            />
           )}
 
           <section className="rounded-md border p-4">

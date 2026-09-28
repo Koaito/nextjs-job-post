@@ -41,9 +41,12 @@ function formatDeadline(iso: string | null): string | null {
 export function JobCard({
   job,
   isAuthenticated,
+  saveVariant = "card",
 }: {
   job: JobCardData;
   isAuthenticated: boolean;
+  /** "saved-list" chỉ dùng ở /profile/saved-jobs (nút "Bỏ lưu"). */
+  saveVariant?: "card" | "saved-list";
 }) {
   const industryStyle = INDUSTRY_BADGE_STYLES[job.industry] ?? INDUSTRY_BADGE_FALLBACK;
   const deadline = formatDeadline(job.deadline);
@@ -127,7 +130,7 @@ export function JobCard({
             </a>
           )}
           {isAuthenticated ? (
-            <SaveJobButton jobId={job.id} variant="card" />
+            <SaveJobButton jobId={job.id} variant={saveVariant} />
           ) : (
             <Link href="/login" className={SAVE_BTN_CLASS}>
               🔖 Đăng nhập để lưu

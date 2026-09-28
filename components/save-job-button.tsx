@@ -4,11 +4,11 @@
 // Tương đương .save-job-form (app.js) bên Flask — 1 form/JS dùng chung,
 // đổi hành vi qua prop `variant` cho từng nơi khác nhau (plan dòng 947).
 //
-// Round này làm 2 biến thể: "card" (trang danh sách, chỉ đổi icon/label)
-// và "detail" (trang chi tiết, đổi thêm cả màu nút primary/ghost). Biến
-// thể thứ 3 plan có nhắc tới, "saved-list" (tự xoá hẳn card khỏi danh
-// sách khi bỏ lưu), để dành cho trang "Job đã lưu" — thuộc Nhóm 5, CHƯA
-// làm ở đây, không thêm code cho case chưa cần.
+// 3 biến thể: "card" (trang danh sách, chỉ đổi icon/label), "detail" (trang
+// chi tiết, đổi thêm cả màu nút primary/ghost) và "saved-list" (trang "Job đã
+// lưu" — Nhóm 5 Đợt 5.2: luôn hiện "🔖 Bỏ lưu"; card tự biến mất khỏi danh
+// sách khi bỏ lưu vì <SavedJobsGrid> lọc theo trạng thái trong Provider, khớp
+// data-remove-on-unsave của saved_jobs.html).
 //
 // Trạng thái "đã lưu" KHÔNG còn là prop `initialSaved` từng nơi tự fetch
 // — đọc từ <SavedJobsProvider> ở app/(app)/layout.tsx (Round 5, plan
@@ -27,7 +27,7 @@ import { toggleSaveJobAction } from "@/lib/actions/job-actions";
 
 interface SaveJobButtonProps {
   jobId: string;
-  variant?: "card" | "detail";
+  variant?: "card" | "detail" | "saved-list";
   /** Staff KHÔNG được lưu job (job_detail.html chỉ hiện aside Lưu/Ứng
    *  tuyển cho học viên) — nơi gọi tự quyết định ẩn hẳn component này ở
    *  biến thể "detail" cho staff. Ở biến thể "card", backend tự chặn +
@@ -59,6 +59,9 @@ export function SaveJobButton({
       // Server là nguồn sự thật: nếu trạng thái thật khác dự đoán lạc quan
       // (vd job đã được lưu/bỏ lưu từ tab khác), lấy theo server.
       if (typeof result.saved === "boolean") setSaved(jobId, result.saved);
+      // Ở danh sách "Job đã lưu" card biến mất ngay -> cần 1 toast để người
+      // dùng biết thao tác đã thành công (Flask: flash "Đã bỏ lưu job.").
+      if (variant === "saved-list" && result.saved === false) toast.success("Đã bỏ lưu job.");
     });
   }
 
@@ -78,6 +81,22 @@ export function SaveJobButton({
         <Icon className="size-4" />
         {label}
       </Button>
+    );
+  }
+
+  // variant === "saved-list": luôn là nút "Bỏ lưu" (job trong danh sách này
+  // vốn đã lưu) — cùng kiểu chữ nhỏ + tô cam như card đã lưu.
+  if (variant === "saved-list") {
+    return (
+      <button
+        type="button"
+        disabled={isPending}
+        onClick={handleClick}
+        title={disabledReason}
+        className={cn(SAVE_BTN_CLASS, SAVE_BTN_SAVED_CLASS)}
+      >
+        🔖 Bỏ lưu
+      </button>
     );
   }
 

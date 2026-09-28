@@ -1,32 +1,35 @@
 // app/(app)/jobs/[jobId]/apply-section.tsx
 // Tương đương nhánh `{% else %}` (không phải staff) của aside trong
-// job_detail.html: khách thấy 2 link đăng nhập, học viên thấy nút Ứng
-// tuyển + nút Lưu job.
+// job_detail.html: khách thấy 2 link đăng nhập; học viên thấy nút Ứng tuyển
+// (hoặc "Đã ứng tuyển · Bấm để huỷ" nếu đã nộp) + nút Lưu job.
 //
-// Server Component thuần — chỉ <SaveJobButton> bên trong là Client
-// Component. Page.tsx chỉ render component này ở nhánh KHÔNG-staff nên
-// không nhận prop isStaff (staff có aside riêng, xem JobStatusPanel).
+// Server Component thuần — chỉ 3 nút bên trong là Client Component
+// (<ApplyJobDialog>, <WithdrawApplicationButton>, <SaveJobButton>). Page.tsx
+// chỉ render component này ở nhánh KHÔNG-staff nên không nhận prop isStaff
+// (staff có aside riêng, xem JobStatusPanel).
 //
-// CHƯA làm ở round này — thuộc Nhóm 5 (plan dòng "Nộp CV khi ứng
-// tuyển", "Huỷ ứng tuyển"):
-//   - nộp CV thật (POST /me/applications, multipart PDF ≤ 5MB — cần
-//     test giới hạn body Vercel ~4.5MB trước, Phụ lục B),
-//   - trạng thái "Đã ứng tuyển · Bấm để huỷ" (already_applied) + Dialog
-//     huỷ có cảnh báo "CV sẽ bị xoá".
-// Vì vậy nút "Ứng tuyển ngay" ở đây bị vô hiệu hoá kèm giải thích, thay
-// vì để bấm được rồi không làm gì.
+// Nhóm 5, Đợt 5.3: nộp CV thật + huỷ ứng tuyển. `alreadyApplied` do page.tsx
+// tính (khớp already_applied của job_detail() bên Flask).
 
 import Link from "next/link";
 import { Bookmark, Send } from "lucide-react";
+import { ApplyJobDialog } from "@/components/apply-job-dialog";
 import { SaveJobButton } from "@/components/save-job-button";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { WithdrawApplicationButton } from "@/components/withdraw-application-button";
+import { buttonVariants } from "@/components/ui/button";
 
 export function ApplySection({
   jobId,
+  jobTitle,
+  companyName,
   isAuthenticated,
+  alreadyApplied,
 }: {
   jobId: string;
+  jobTitle: string;
+  companyName: string;
   isAuthenticated: boolean;
+  alreadyApplied: boolean;
 }) {
   // Đường quay lại sau khi đăng nhập. /login đã tự lọc `next` qua
   // safeInternalPath() (login/page.tsx), path này cũng luôn là path nội
@@ -50,13 +53,16 @@ export function ApplySection({
 
   return (
     <section className="space-y-2 rounded-md border p-4">
-      <Button type="button" className="w-full" disabled>
-        <Send />
-        Ứng tuyển ngay
-      </Button>
-      <p className="text-xs text-muted-foreground">
-        Nộp CV trực tiếp trên trang này sẽ có ở bản cập nhật sau.
-      </p>
+      {alreadyApplied ? (
+        <WithdrawApplicationButton
+          jobId={jobId}
+          jobTitle={jobTitle}
+          companyName={companyName}
+          variant="detail"
+        />
+      ) : (
+        <ApplyJobDialog jobId={jobId} jobTitle={jobTitle} companyName={companyName} />
+      )}
       <SaveJobButton jobId={jobId} variant="detail" />
     </section>
   );

@@ -30,7 +30,7 @@ export default async function ProfilePage() {
   const isStudent = !user.is_staff;
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-2xl space-y-6">
       <p className="text-muted-foreground">Xem lại thông tin tài khoản và cập nhật họ tên hiển thị.</p>
 
       <dl className="grid grid-cols-1 gap-4 rounded-md border p-4 sm:grid-cols-3">

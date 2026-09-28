@@ -19,7 +19,7 @@ export default async function ProfileLayout({ children }: { children: React.Reac
   const user = await requireUser();
 
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-6">
+    <div className="w-full space-y-6">
       <header>
         <span className="text-sm text-muted-foreground">Career Hub / Trang cá nhân</span>
         <h1 className="font-heading text-3xl font-semibold">Trang cá nhân</h1>

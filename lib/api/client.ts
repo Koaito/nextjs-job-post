@@ -32,10 +32,16 @@ async function rawFetch<T>(
   init: RequestInit = {},
   token?: string,
 ): Promise<T> {
+  // Body là FormData (multipart, vd nộp CV — POST /me/applications) thì
+  // TUYỆT ĐỐI không tự đặt Content-Type: fetch phải tự sinh header kèm
+  // `boundary=...`, ép "application/json" sẽ làm backend không parse được
+  // form. Mọi body khác vẫn mặc định JSON như cũ.
+  const isFormData = typeof FormData !== "undefined" && init.body instanceof FormData;
+
   const res = await fetch(`${process.env.CRAWLER_API_URL}${path}`, {
     ...init,
     headers: {
-      "Content-Type": "application/json",
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       "X-API-Key": process.env.CRAWLER_API_KEY!,
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...init.headers,

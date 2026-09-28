@@ -11,8 +11,8 @@
 // Mục có `enabled: false` = route đích chưa làm -> hiện mờ, không bấm
 // được (thay vì dẫn tới 404; cùng cách tab "Quản lý mẫu email" từng bị
 // disabled ở /contacts trước khi làm xong). Bật lại (bỏ dòng enabled)
-// khi làm xong route: Đợt 5.2 (saved-jobs), 5.3 (applications), 5.4
-// (activity).
+// khi làm xong route. Còn lại: "Hoạt động" (Đợt 5.4) — 2 mục học viên
+// (saved-jobs, applications) đã bật ở Đợt 5.2/5.3.
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -28,8 +28,8 @@ interface SubnavItem {
 const ITEMS: SubnavItem[] = [
   { href: "/profile", label: "Thông tin chung", audience: "all" },
   { href: "/profile/security", label: "Bảo mật", audience: "all" },
-  { href: "/profile/saved-jobs", label: "Job đã lưu", audience: "student", enabled: false },
-  { href: "/profile/applications", label: "Đã ứng tuyển", audience: "student", enabled: false },
+  { href: "/profile/saved-jobs", label: "Job đã lưu", audience: "student" },
+  { href: "/profile/applications", label: "Đã ứng tuyển", audience: "student" },
   { href: "/profile/activity", label: "Hoạt động", audience: "staff", enabled: false },
 ];
 
