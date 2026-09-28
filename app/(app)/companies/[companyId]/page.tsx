@@ -6,8 +6,8 @@
 // người liên hệ" (route /companies/[companyId]/contacts/add) và nút "Sửa"
 // (<EditContactDialog>) mỗi dòng contact đang active; cột Trạng thái là
 // <ContactStatusCell> đổi tại chỗ (mục 3 — Flask company_detail cũng chỉ có
-// cell trạng thái, không có cell phụ trách). Xoá mềm thuộc mục 5 — chưa
-// làm. Nếu GET
+// cell trạng thái, không có cell phụ trách) và nút "Xóa" xoá mềm
+// (<DeleteContactButton>, mục 5). Nếu GET
 // /companies/{id}/contacts lỗi (vd token hết hạn giữa lúc load 2 request
 // song song) -> catch về [] thay vì làm sập cả trang chi tiết công ty chỉ
 // vì phần phụ này, khớp tinh thần "job chính hiện được là ưu tiên" của
@@ -24,6 +24,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { DeleteCompanyButton } from "./delete-company-button";
 import { EditContactDialog } from "@/components/edit-contact-dialog";
 import { ContactStatusCell } from "@/components/contact-cells";
+import { DeleteContactButton } from "@/components/delete-contact-button";
 import { HardDeleteContactButton } from "./hard-delete-contact-button";
 
 function formatDate(iso: string | null | undefined): string {
@@ -185,19 +186,26 @@ export default async function CompanyDetailPage({
                 <ContactTable
                   contacts={activeContacts}
                   renderActions={(c) => (
-                    <EditContactDialog
-                      companyId={company.company_id}
-                      companyName={company.company_name}
-                      contactId={c.contact_id}
-                      initialValues={{
-                        contactName: c.contact_name,
-                        title: c.job_title ?? "",
-                        email: c.work_email ?? "",
-                        contactLink: c.social_link ?? "",
-                        phone: c.phone_number ?? "",
-                        source: c.found_source ?? "",
-                      }}
-                    />
+                    <>
+                      <EditContactDialog
+                        companyId={company.company_id}
+                        companyName={company.company_name}
+                        contactId={c.contact_id}
+                        initialValues={{
+                          contactName: c.contact_name,
+                          title: c.job_title ?? "",
+                          email: c.work_email ?? "",
+                          contactLink: c.social_link ?? "",
+                          phone: c.phone_number ?? "",
+                          source: c.found_source ?? "",
+                        }}
+                      />
+                      <DeleteContactButton
+                        companyId={company.company_id}
+                        contactId={c.contact_id}
+                        contactName={c.contact_name}
+                      />
+                    </>
                   )}
                 />
               </div>

@@ -4,7 +4,7 @@
 // Phần 2: mục 2 (createContactAction/updateContactAction cho <ContactForm>)
 // và mục 6 (hardDeleteContactAction, nút "Xoá hẳn" ở /companies/[companyId]).
 // mục 3 (updateContactStatusAction/assignContactAction cho 2 cell đổi tại
-// chỗ). CHƯA làm: deleteContact (soft) — Phần 2 mục 5.
+// chỗ), mục 5 (deleteContactAction — xoá mềm có note bắt buộc).
 
 import { revalidatePath } from "next/cache";
 import { ApiError } from "@/lib/api/client";
@@ -14,6 +14,7 @@ import {
   updateContact,
   updateContactStatus,
   assignContact,
+  deleteContact,
   hardDeleteContact,
   isContactNotFound,
   type ContactInput,
@@ -197,4 +198,36 @@ export async function assignContactAction(
     const message = err instanceof ApiError ? err.message : "Không thể cập nhật người phụ trách, thử lại sau.";
     return { ok: false, message };
   }
+}
+
+/**
+ * DELETE /companies/{company_id}/contacts/{contact_id} — xoá MỀM, note BẮT
+ * BUỘC vô điều kiện (plan dòng 994). Sửa bug Flask (plan dòng 988): nút Xoá
+ * ở /contacts từng không gửi note nên luôn thất bại, và redirect cứng về
+ * trang công ty. Ở đây action KHÔNG redirect — chỉ revalidate cả 2 trang có
+ * thể chứa contact (/contacts và chi tiết công ty); nơi bấm (<DeleteContactButton>)
+ * ở lại đúng trang đang đứng và tự refresh.
+ *
+ * 404 (contact đã bị xoá ở tab khác) vẫn coi là thành công — mục tiêu cuối
+ * (contact không còn active) đã đạt, cùng cách deleteCompanyAction().
+ */
+export async function deleteContactAction(
+  companyId: string,
+  contactId: string,
+  note: string,
+): Promise<ContactNoteActionResult> {
+  if (!note.trim()) {
+    return { ok: false, message: "Xoá người liên hệ bắt buộc phải nhập ghi chú lý do." };
+  }
+  try {
+    await deleteContact(companyId, contactId, note.trim());
+  } catch (err) {
+    if (!isContactNotFound(err)) {
+      const message = err instanceof ApiError ? err.message : "Không thể xoá người liên hệ, thử lại sau.";
+      return { ok: false, message };
+    }
+  }
+  revalidatePath("/contacts");
+  revalidatePath(`/companies/${companyId}`);
+  return { ok: true, message: "Đã xoá người liên hệ." };
 }

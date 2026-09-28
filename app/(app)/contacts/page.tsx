@@ -5,9 +5,9 @@
 //
 // Mục 1: đọc + lọc. Mục 2-3: cột "Thao tác" có nút "Sửa" (<EditContactDialog>);
 // cột Trạng thái / Phụ trách là 2 cell đổi tại chỗ (<ContactStatusCell>,
-// <ContactAssignCell>, components/contact-cells.tsx). Cố ý CHƯA có (làm ở
-// mục sau, không dựng nút chết):
-//   - mục 5: nút "Xóa" (NoteConfirmDialog noteRequired);
+// <ContactAssignCell>, components/contact-cells.tsx). Mục 5: nút "Xóa" xoá
+// mềm (<DeleteContactButton> — xin note bắt buộc, ở lại trang này; sửa bug
+// Flask). Cố ý CHƯA có (không dựng nút chết):
 //   - Phần 3: nút "✉ Mẫu email" (EmailTemplatePickerModal).
 //
 // Không phân trang: GET /contacts trả thẳng mảng (không có `total`), Flask
@@ -23,6 +23,7 @@ import { listStaffUsers } from "@/lib/api/auth";
 import { CONTACT_STATUS_CODES } from "@/lib/constants";
 import { ContactStatusCell, ContactAssignCell } from "@/components/contact-cells";
 import { EditContactDialog } from "@/components/edit-contact-dialog";
+import { DeleteContactButton } from "@/components/delete-contact-button";
 import { ContactFilterBar } from "./filter-bar";
 
 export const dynamic = "force-dynamic";
@@ -191,6 +192,11 @@ export default async function ContactsPage({
                         phone: c.phone_number ?? "",
                         source: c.found_source ?? "",
                       }}
+                    />
+                    <DeleteContactButton
+                      companyId={c.company_id}
+                      contactId={c.contact_id}
+                      contactName={c.contact_name}
                     />
                   </td>
                 </tr>

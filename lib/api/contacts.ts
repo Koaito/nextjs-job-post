@@ -4,7 +4,7 @@
 // Đã làm: list theo company (bảng read-only ở /companies/[companyId]),
 // list gộp toàn hệ thống (/contacts, Nhóm 2 Phần 2 mục 1), tạo/sửa
 // (Phần 2 mục 2, <ContactForm>), đổi status/assign tại chỗ (mục 3),
-// hard-delete (mục 6). CHƯA làm: xoá mềm — Phần 2 mục 5.
+// xoá mềm (mục 5), hard-delete (mục 6).
 //
 // TOÀN BỘ route /companies/{id}/contacts yêu cầu require_role("ss_team")
 // ở backend (thông tin liên hệ nhạy cảm — email/SĐT cá nhân, khác GET
@@ -215,5 +215,21 @@ export async function assignContact(
   return callAuthed<CompanyContactOut>(`/companies/${companyId}/contacts/${contactId}/assign`, {
     method: "PATCH",
     body: JSON.stringify(payload),
+  });
+}
+
+// --- Phần 2, mục 5: xoá MỀM contact.
+
+/**
+ * DELETE /companies/{company_id}/contacts/{contact_id} — xoá MỀM
+ * (is_active=false), không xoá khỏi DB (khớp delete_contact() bên Flask).
+ * note BẮT BUỘC vô điều kiện (ContactDeleteRequest.note — plan dòng 994:
+ * mọi thao tác XOÁ đều đòi note, không áp luật "chỉ khi có đổi"). Contact
+ * xoá mềm xong vẫn xem/xoá hẳn được ở khối "Đã xoá" của /companies/[id].
+ */
+export async function deleteContact(companyId: string, contactId: string, note: string): Promise<void> {
+  await callAuthed<void>(`/companies/${companyId}/contacts/${contactId}`, {
+    method: "DELETE",
+    body: JSON.stringify({ note }),
   });
 }
