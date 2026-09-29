@@ -54,7 +54,7 @@ export default async function CompaniesPage({
   let page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
   let offset = (page - 1) * COMPANIES_PER_PAGE;
   let data = await listCompanies(filters, { limit: COMPANIES_PER_PAGE, offset });
-  let totalPages = Math.max(1, Math.ceil(data.total / COMPANIES_PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(data.total / COMPANIES_PER_PAGE));
 
   // Khớp Flask: page vượt quá tổng số trang -> ghim về trang cuối, gọi
   // lại đúng 1 lần (giống app/(app)/jobs/page.tsx).
