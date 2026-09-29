@@ -65,3 +65,29 @@ export function formatDateVN(value: string | null | undefined): string {
   const [y, m, d] = iso.split("-");
   return `${d}/${m}/${y}`;
 }
+
+// "en-GB" cho sẵn "dd/mm/yyyy, HH:mm" — chỉ thay dấu phẩy bằng khoảng
+// trắng bên dưới để khớp định dạng "%d/%m/%Y %H:%M" của format_date() bên
+// Flask (vd cột "Lần đăng nhập gần nhất" ở /staff-accounts).
+const VN_DATETIME_FORMAT = new Intl.DateTimeFormat("en-GB", {
+  timeZone: VN_TZ,
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+
+/**
+ * Chuỗi datetime ISO có múi giờ (backend luôn trả UTC "...Z" cho các cột
+ * timestamptz như last_login_at) -> "dd/mm/yyyy HH:mm" theo giờ VN, hoặc
+ * "—" nếu rỗng/không parse được. KHÁC formatDateVN() ở trên: hàm đó dùng
+ * cho cột DATE thuần (không giờ), hàm này cho TIMESTAMP cần hiện cả giờ:phút.
+ */
+export function formatDateTimeVN(value: string | null | undefined): string {
+  if (!value) return "—";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "—";
+  return VN_DATETIME_FORMAT.format(parsed).replace(",", "");
+}

@@ -123,3 +123,14 @@ export async function listStaffUsers(): Promise<StaffUser[]> {
   const all = await callAuthed<StaffUser[]>("/auth/users");
   return all.filter((u) => u.role === "ss_team" || u.role === "admin");
 }
+
+/**
+ * GET /auth/users — TOÀN BỘ tài khoản, KHÔNG lọc role (khác
+ * listStaffUsers() ở trên). Dùng cho /staff-accounts (Nhóm 3, Đợt 3.2,
+ * Phần 1/4): khớp accounts() bên Flask (blueprints/staff.py) — trang này
+ * cố ý liệt kê cả học viên tự đăng ký (role "user"), không chỉ nhân sự
+ * team SS, để admin thấy/khoá được cả tài khoản học viên nếu cần.
+ */
+export async function listAllUsers(): Promise<StaffUser[]> {
+  return callAuthed<StaffUser[]>("/auth/users");
+}
