@@ -149,6 +149,29 @@ export async function listAllCompaniesCreatedBy(ssUserId: string): Promise<Compa
   return all;
 }
 
+/**
+ * TOÀN BỘ công ty (bản ghi CompanyOut đầy đủ) gộp từ nhiều trang — dùng
+ * cho tab "Tổng quan" của /dashboard (Nhóm 3: đếm "Công ty theo thành
+ * phố" cần province_name của từng công ty). KHÁC listAllCompanies() ở
+ * trên (chỉ trả id/tên/MST cho combobox) và KHÁC listAllCompaniesCreatedBy()
+ * (có lọc created_by, gọi tuần tự). Cùng cách listAllJobs(): trang đầu
+ * lấy `total`, các trang còn lại chạy song song. Route PUBLIC -> callPublic.
+ */
+export async function listAllCompanyRecords(): Promise<CompanyOut[]> {
+  const fetchPage = (offset: number) =>
+    callPublic<PaginatedCompanies>(
+      `/companies?${new URLSearchParams({ limit: String(MAX_COMPANIES_PAGE), offset: String(offset) })}`,
+    );
+
+  const first = await fetchPage(0);
+  const total = Math.min(first.total, ALL_COMPANIES_SAFETY_CAP);
+  const offsets: number[] = [];
+  for (let offset = MAX_COMPANIES_PAGE; offset < total; offset += MAX_COMPANIES_PAGE) offsets.push(offset);
+
+  const rest = await Promise.all(offsets.map(fetchPage));
+  return [first, ...rest].flatMap((page) => page.items);
+}
+
 // ---------------------------------------------------------------------------
 // Nhóm 2, Phần 1 — /companies (list phân trang), /companies/[id] (detail),
 // /companies/[id]/edit, sửa nhanh "Tiềm năng" tại bảng danh sách.

@@ -112,6 +112,35 @@ export async function listAllJobsCreatedBy(ssUserId: string): Promise<JobOut[]> 
   return all;
 }
 
+/**
+ * TOÀN BỘ job (mọi trạng thái) gộp từ nhiều trang thành 1 mảng — dùng cho
+ * tab "Tổng quan" của /dashboard (Nhóm 3), khớp list_all_jobs() không tham
+ * số bên Flask: KHÔNG truyền `status` nên gồm cả job đã đóng, khác
+ * buildJobQuery() ở trên (mặc định OPEN cho trang chủ). Route PUBLIC ->
+ * callPublic, giống listJobs().
+ *
+ * Khác listAllJobsCreatedBy() (gọi tuần tự từng trang): gọi trang đầu để
+ * biết `total`, rồi bắn CÁC TRANG CÒN LẠI song song — dashboard là trang
+ * chậm nhất hệ thống (plan Nhóm 3), và mọi trang đều độc lập nhau nên
+ * song song là an toàn (chỉ GET, không auth nên không dính race refresh
+ * token, Phụ lục A). Tổng job dự kiến 5.000-7.000 (plan Phần 1 mục 2.2)
+ * -> tối đa ~35 trang, vẫn nằm trong ALL_JOBS_SAFETY_CAP.
+ */
+export async function listAllJobs(): Promise<JobOut[]> {
+  const fetchPage = (offset: number) =>
+    callPublic<PaginatedJobs>(
+      `/jobs?${new URLSearchParams({ limit: String(MAX_JOBS_PAGE), offset: String(offset) })}`,
+    );
+
+  const first = await fetchPage(0);
+  const total = Math.min(first.total, ALL_JOBS_SAFETY_CAP);
+  const offsets: number[] = [];
+  for (let offset = MAX_JOBS_PAGE; offset < total; offset += MAX_JOBS_PAGE) offsets.push(offset);
+
+  const rest = await Promise.all(offsets.map(fetchPage));
+  return [first, ...rest].flatMap((page) => page.items);
+}
+
 export interface JobCardData {
   id: string;
   position: string;
