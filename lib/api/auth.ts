@@ -169,3 +169,21 @@ export async function updateUserRole(ssUserId: string, role: string): Promise<St
     body: JSON.stringify({ role }),
   });
 }
+
+/**
+ * PATCH /auth/users/{id}/active-status — CHỈ admin. `isActive=false` là
+ * khoá VĨNH VIỄN (khác locked_until — khoá tạm do sai mật khẩu, tự hết
+ * hạn). Backend trả 400 nếu id trùng chính admin đang gọi. Nơi gọi tự
+ * requireAdmin() trước.
+ *
+ * Hiệu lực: get_current_user() ở backend đã đọc is_active mới nhất từ DB
+ * và trả 403 AUTH_ACCOUNT_INACTIVE ngay ở request kế tiếp của người bị
+ * khoá (mục 3.10 của plan đã sửa ở api/deps.py) — KHÔNG còn trễ tối đa 30
+ * phút như docstring cũ của db/auth.py::update_user_active_status().
+ */
+export async function updateUserActiveStatus(ssUserId: string, isActive: boolean): Promise<StaffUser> {
+  return callAuthed<StaffUser>(`/auth/users/${encodeURIComponent(ssUserId)}/active-status`, {
+    method: "PATCH",
+    body: JSON.stringify({ is_active: isActive }),
+  });
+}

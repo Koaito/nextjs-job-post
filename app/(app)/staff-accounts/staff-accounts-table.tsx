@@ -1,8 +1,8 @@
 "use client";
 // app/(app)/staff-accounts/staff-accounts-table.tsx
 // Bảng + thanh lọc của /staff-accounts — Nhóm 3, Đợt 3.2. Phần 1/4: xem +
-// lọc. Phần 3/4: cột "Đổi role" (CHỈ admin thấy, kèm Dialog xác nhận).
-// Khoá/mở tài khoản là phần 4/4, sẽ thêm vào cùng cột này.
+// lọc. Phần 3/4: đổi role (Dialog xác nhận). Phần 4/4: khoá/mở tài khoản.
+// Cột "Thao tác" CHỈ admin thấy (server action vẫn requireAdmin() lại).
 //
 // Lọc HOÀN TOÀN client-side (KHÔNG round-trip server khi gõ/đổi filter) —
 // đúng ghi chú của plan Nhóm 3 Phần 3 (mục staff-accounts): toàn bộ tài
@@ -13,8 +13,12 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import { NoteConfirmDialog } from "@/components/note-confirm-dialog";
-import { updateStaffRoleAction } from "@/lib/actions/staff-account-actions";
+import {
+  updateStaffActiveStatusAction,
+  updateStaffRoleAction,
+} from "@/lib/actions/staff-account-actions";
 import { ROLE_LABELS } from "@/lib/constants";
 import { formatDateTimeVN } from "@/lib/date";
 import type { StaffUser } from "@/lib/api/auth";
@@ -42,6 +46,11 @@ export function StaffAccountsTable({
   // Đổi role CHỜ xác nhận: select vẫn hiện role hiện tại (controlled bởi
   // u.role) nên bấm Hủy tự động "trả lại" lựa chọn cũ, không cần reset tay.
   const [pendingRole, setPendingRole] = useState<{ user: StaffUser; newRole: string } | null>(null);
+  // Khoá tài khoản CHỜ xác nhận (Flask cũng confirm() khi khoá). Mở lại thì
+  // chạy luôn, không confirm — giống Flask (mở lại được, không nguy hiểm).
+  const [pendingLock, setPendingLock] = useState<StaffUser | null>(null);
+  // ss_user_id đang gọi "Kích hoạt lại" — chống bấm đúp, disable đúng nút đó.
+  const [reactivatingId, setReactivatingId] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [role, setRole] = useState("");
   const [status, setStatus] = useState<StatusFilter>("");
@@ -56,6 +65,19 @@ export function StaffAccountsTable({
       return matchesQ && matchesRole && matchesStatus;
     });
   }, [users, q, role, status]);
+
+  async function handleReactivate(u: StaffUser) {
+    if (reactivatingId) return;
+    setReactivatingId(u.ss_user_id);
+    const result = await updateStaffActiveStatusAction(u.ss_user_id, true);
+    setReactivatingId(null);
+    if (result.ok) {
+      toast.success(result.message);
+      router.refresh();
+    } else {
+      toast.error(result.message);
+    }
+  }
 
   if (users.length === 0) {
     return (
@@ -113,7 +135,7 @@ export function StaffAccountsTable({
               <th className="px-3 py-2 font-medium">Role</th>
               <th className="px-3 py-2 font-medium">Trạng thái</th>
               <th className="px-3 py-2 font-medium">Lần đăng nhập gần nhất</th>
-              {isAdmin && <th className="px-3 py-2 font-medium">Đổi role</th>}
+              {isAdmin && <th className="px-3 py-2 font-medium">Thao tác</th>}
             </tr>
           </thead>
           <tbody>
@@ -147,21 +169,47 @@ export function StaffAccountsTable({
                             </option>
                           ))}
                         </select>
+                        <Button type="button" variant="ghost" size="sm" disabled>
+                          Vô hiệu hoá
+                        </Button>
                         <span className="text-xs text-muted-foreground">Tài khoản của bạn</span>
                       </div>
                     ) : (
-                      <select
-                        value={u.role}
-                        onChange={(e) => setPendingRole({ user: u, newRole: e.target.value })}
-                        aria-label={`Đổi role của ${u.full_name}`}
-                        className="rounded-md border bg-background px-2 py-1 text-sm"
-                      >
-                        {ROLES.map((r) => (
-                          <option key={r} value={r}>
-                            {ROLE_LABELS[r]}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <select
+                          value={u.role}
+                          onChange={(e) => setPendingRole({ user: u, newRole: e.target.value })}
+                          aria-label={`Đổi role của ${u.full_name}`}
+                          className="rounded-md border bg-background px-2 py-1 text-sm"
+                        >
+                          {ROLES.map((r) => (
+                            <option key={r} value={r}>
+                              {ROLE_LABELS[r]}
+                            </option>
+                          ))}
+                        </select>
+                        {u.is_active ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => setPendingLock(u)}
+                          >
+                            Vô hiệu hoá
+                          </Button>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={reactivatingId !== null}
+                            onClick={() => handleReactivate(u)}
+                          >
+                            {reactivatingId === u.ss_user_id ? "Đang xử lý…" : "Kích hoạt lại"}
+                          </Button>
+                        )}
+                      </div>
                     )}
                   </td>
                 )}
@@ -195,6 +243,34 @@ export function StaffAccountsTable({
         onConfirm={async () => {
           if (!pendingRole) return { ok: false, message: "Không có thay đổi để lưu." };
           const result = await updateStaffRoleAction(pendingRole.user.ss_user_id, pendingRole.newRole);
+          if (result.ok) {
+            toast.success(result.message);
+            router.refresh();
+          }
+          return result;
+        }}
+      />
+
+      <NoteConfirmDialog
+        open={pendingLock !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingLock(null);
+        }}
+        showNote={false}
+        danger
+        title="Vô hiệu hoá tài khoản?"
+        description={
+          pendingLock && (
+            <>
+              Vô hiệu hoá tài khoản <strong>{pendingLock.full_name}</strong>? Người này sẽ không đăng nhập
+              được nữa cho tới khi được kích hoạt lại.
+            </>
+          )
+        }
+        confirmLabel="Vô hiệu hoá"
+        onConfirm={async () => {
+          if (!pendingLock) return { ok: false, message: "Không có thay đổi để lưu." };
+          const result = await updateStaffActiveStatusAction(pendingLock.ss_user_id, false);
           if (result.ok) {
             toast.success(result.message);
             router.refresh();

@@ -4,11 +4,11 @@
 //   [x] Phần 1/4 — khung trang + bảng + lọc (CHỈ XEM, file này)
 //   [x] Phần 2/4 — /staff-accounts/add (tạo tài khoản, admin-only) + nút "＋ Thêm tài khoản"
 //   [x] Phần 3/4 — đổi role (admin-only, có Dialog xác nhận)
-//   [ ] Phần 4/4 — khoá/mở tài khoản (admin-only)
+//   [x] Phần 4/4 — khoá/mở tài khoản (admin-only, Dialog xác nhận khi khoá)
 //
 // CHỈ STAFF (staff_required bên Flask): requireStaff() — ss_team xem được,
 // KHÔNG chỉ admin (3 hành động mutate mới cần requireAdmin(), làm ở Phần
-// 2-4). force-dynamic: trạng thái tài khoản (is_active/role) ảnh hưởng
+// 2-4, đã xong). force-dynamic: trạng thái tài khoản (is_active/role) ảnh hưởng
 // trực tiếp tới việc đăng nhập được hay không, cần luôn thấy số liệu mới
 // nhất khi vào trang, không dựa vào cache trang cũ.
 
@@ -44,7 +44,7 @@ export default async function StaffAccountsPage() {
           <h1 className="font-heading text-3xl font-semibold">Tài khoản team SS</h1>
           <p className="mt-1 max-w-2xl text-muted-foreground">
             Danh sách toàn bộ tài khoản đăng nhập qua backend (gồm cả học viên tự đăng ký). Chỉ tài khoản{" "}
-            <strong>admin</strong> mới tạo được tài khoản mới hoặc đổi role người khác.
+            <strong>admin</strong> mới tạo được tài khoản mới, đổi role hoặc khoá/mở tài khoản người khác.
           </p>
         </div>
         {isAdmin && (
@@ -57,7 +57,7 @@ export default async function StaffAccountsPage() {
       {!isAdmin && (
         <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
           Bạn đang xem ở chế độ chỉ đọc (role hiện tại: <strong>{user.role}</strong>) — chỉ tài khoản{" "}
-          <strong>admin</strong> mới tạo tài khoản mới hoặc đổi role người khác.
+          <strong>admin</strong> mới tạo tài khoản mới, đổi role hoặc khoá/mở tài khoản người khác.
         </p>
       )}
 

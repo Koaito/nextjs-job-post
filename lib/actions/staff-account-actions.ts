@@ -2,7 +2,7 @@
 
 // lib/actions/staff-account-actions.ts
 // Server action của /staff-accounts — Nhóm 3, Đợt 3.2. Phần 2/4: tạo
-// tài khoản; phần 3/4: đổi role (khoá/mở = phần 4, sẽ thêm vào file này).
+// tài khoản; phần 3/4: đổi role; phần 4/4: khoá/mở tài khoản.
 //
 // requireAdmin() ở ĐẦU mỗi action (plan Phần 2 mục 4): Flask check role
 // admin ngay trong hàm chứ không qua decorator, nên dễ bỏ sót — ẩn nút ở
@@ -11,7 +11,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth-guard";
 import { ApiError } from "@/lib/api/client";
-import { createUser, updateUserRole } from "@/lib/api/auth";
+import { createUser, updateUserActiveStatus, updateUserRole } from "@/lib/api/auth";
 import { ROLE_LABELS } from "@/lib/constants";
 
 export interface CreateStaffAccountInput {
@@ -108,6 +108,34 @@ export async function updateStaffRoleAction(
     return { ok: true, message: "Đã cập nhật role." };
   } catch (err) {
     const message = err instanceof ApiError ? err.message : "Không thể đổi role, thử lại sau.";
+    return { ok: false, message };
+  }
+}
+
+/**
+ * Khoá (isActive=false) / mở lại (isActive=true) 1 tài khoản (Phần 4/4).
+ * Không có note — backend PATCH /active-status không nhận note; lớp ma
+ * sát khi KHOÁ là Dialog xác nhận ở UI (Flask cũng chỉ confirm() khi khoá,
+ * mở lại thì bấm là chạy luôn).
+ */
+export async function updateStaffActiveStatusAction(
+  ssUserId: string,
+  isActive: boolean,
+): Promise<StaffAccountActionResult> {
+  const admin = await requireAdmin();
+
+  if (typeof isActive !== "boolean") return { ok: false, message: "Trạng thái không hợp lệ." };
+  // Backend cũng chặn (400) — chặn sớm cho khỏi 1 lượt gọi vô ích.
+  if (ssUserId === admin.ss_user_id) {
+    return { ok: false, message: "Bạn không thể tự khoá/kích hoạt chính mình." };
+  }
+
+  try {
+    await updateUserActiveStatus(ssUserId, isActive);
+    revalidatePath("/staff-accounts");
+    return { ok: true, message: isActive ? "Đã kích hoạt lại tài khoản." : "Đã vô hiệu hoá tài khoản." };
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : "Không thể cập nhật trạng thái, thử lại sau.";
     return { ok: false, message };
   }
 }
