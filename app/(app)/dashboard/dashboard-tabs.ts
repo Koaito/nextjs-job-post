@@ -11,7 +11,7 @@
 
 export const DASHBOARD_TABS = [
   { id: "tong-quan", label: "Tổng quan", ready: true },
-  { id: "hoc-vien", label: "Gợi ý học viên", ready: false },
+  { id: "hoc-vien", label: "Gợi ý học viên", ready: true },
   { id: "doanh-nghiep", label: "Doanh nghiệp", ready: false },
   { id: "bao-cao", label: "Báo cáo tháng", ready: false },
 ] as const;

@@ -51,3 +51,17 @@ export function toVNDate(value: string | null | undefined): string | null {
   if (Number.isNaN(parsed.getTime())) return null;
   return VN_DATE_FORMAT.format(parsed);
 }
+
+/**
+ * Chuỗi ngày/giờ từ backend -> "dd/mm/yyyy" theo giờ VN, hoặc "—" nếu
+ * rỗng/không parse được. Tương đương filter format_date() bên Flask (mặc
+ * định "%d/%m/%Y") và dùng cùng quy tắc quy đổi múi giờ của toVNDate(),
+ * nên không phụ thuộc múi giờ máy chạy (Vercel = UTC) hay locale trình
+ * duyệt như `new Date(...).toLocaleDateString()`.
+ */
+export function formatDateVN(value: string | null | undefined): string {
+  const iso = toVNDate(value);
+  if (!iso) return "—";
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}

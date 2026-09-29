@@ -3,7 +3,7 @@
 // "Tổng quan thị trường job & database doanh nghiệp". Nhóm 3, Đợt 3.1 của
 // plan, LÀM THEO TỪNG PHẦN (mỗi phần 1 tab):
 //   [x] Phần 1/4 — khung trang + tab "Tổng quan"   (file này + overview-tab.tsx)
-//   [ ] Phần 2/4 — tab "Gợi ý học viên"
+//   [x] Phần 2/4 — tab "Gợi ý học viên"          (students-tab.tsx)
 //   [ ] Phần 3/4 — tab "Doanh nghiệp" (kèm `?followup_days=7|14|30`)
 //   [ ] Phần 4/4 — tab "Báo cáo tháng"
 //
@@ -24,8 +24,9 @@ import { Suspense } from "react";
 import { requireStaff } from "@/lib/auth-guard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DashboardTabBar } from "./dashboard-tab-bar";
-import { DASHBOARD_TABS, parseDashboardTab } from "./dashboard-tabs";
+import { DASHBOARD_TABS, parseDashboardTab, type DashboardTabId } from "./dashboard-tabs";
 import { OverviewTab } from "./overview-tab";
+import { StudentsTab } from "./students-tab";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,22 @@ export const metadata = {
   title: "Dashboard — MindX Career Hub",
 };
 
-function TabSkeleton() {
+function TabSkeleton({ tab }: { tab: DashboardTabId }) {
+  // Tab Tổng quan có hàng KPI + biểu đồ; các tab còn lại chỉ gồm các thẻ
+  // bảng/danh sách -> skeleton khác để không nháy ra "6 thẻ KPI" rồi mới
+  // đổi thành bảng.
+  if (tab !== "tong-quan") {
+    return (
+      <div className="space-y-6" aria-busy="true" aria-label="Đang tải dữ liệu">
+        <Skeleton className="h-[260px]" />
+        <Skeleton className="h-[260px]" />
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Skeleton className="h-[260px]" />
+          <Skeleton className="h-[260px]" />
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="space-y-6" aria-busy="true" aria-label="Đang tải dữ liệu">
       <div className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-3.5">
@@ -71,9 +87,11 @@ export default async function DashboardPage({
 
       <DashboardTabBar active={tab} />
 
-      <Suspense key={tab} fallback={<TabSkeleton />}>
+      <Suspense key={tab} fallback={<TabSkeleton tab={tab} />}>
         {tab === "tong-quan" ? (
           <OverviewTab />
+        ) : tab === "hoc-vien" ? (
+          <StudentsTab />
         ) : (
           // Tab chưa làm (link có `?tab=` gõ tay/chia sẻ từ bản khác): báo rõ
           // thay vì lặng lẽ rơi về "Tổng quan" khiến người xem tưởng đã mở đúng.
