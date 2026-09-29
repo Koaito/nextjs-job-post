@@ -5,7 +5,7 @@
 //   [x] Phần 1/4 — khung trang + tab "Tổng quan"   (file này + overview-tab.tsx)
 //   [x] Phần 2/4 — tab "Gợi ý học viên"          (students-tab.tsx)
 //   [x] Phần 3/4 — tab "Doanh nghiệp" (kèm `?followup_days=7|14|30`) (companies-tab.tsx)
-//   [ ] Phần 4/4 — tab "Báo cáo tháng"
+//   [x] Phần 4/4 — tab "Báo cáo tháng"          (monthly-tab.tsx)
 //
 // CHỈ STAFF (staff_required bên Flask): requireStaff() ở đầu trang. Học
 // viên vào thẳng URL -> 404 (nav cũng không hiện mục này cho họ).
@@ -25,8 +25,9 @@ import { requireStaff } from "@/lib/auth-guard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DashboardTabBar } from "./dashboard-tab-bar";
 import { parseFollowupDays } from "@/lib/dashboard/companies";
-import { DASHBOARD_TABS, parseDashboardTab, type DashboardTabId } from "./dashboard-tabs";
+import { parseDashboardTab, type DashboardTabId } from "./dashboard-tabs";
 import { CompaniesTab } from "./companies-tab";
+import { MonthlyTab } from "./monthly-tab";
 import { OverviewTab } from "./overview-tab";
 import { StudentsTab } from "./students-tab";
 
@@ -37,9 +38,25 @@ export const metadata = {
 };
 
 function TabSkeleton({ tab }: { tab: DashboardTabId }) {
-  // Tab Tổng quan có hàng KPI + biểu đồ; các tab còn lại chỉ gồm các thẻ
-  // bảng/danh sách -> skeleton khác để không nháy ra "6 thẻ KPI" rồi mới
-  // đổi thành bảng.
+  // Tab Tổng quan có hàng KPI + biểu đồ; tab Báo cáo tháng có hàng 5 thẻ số
+  // + 2 thẻ top; các tab còn lại chỉ gồm các thẻ bảng/danh sách -> mỗi loại
+  // 1 skeleton riêng để không nháy ra "6 thẻ KPI" rồi mới đổi thành bảng.
+  if (tab === "bao-cao") {
+    return (
+      <div className="space-y-6" aria-busy="true" aria-label="Đang tải dữ liệu">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3.5">
+          {Array.from({ length: 5 }, (_, i) => (
+            <Skeleton key={i} className="h-[92px]" />
+          ))}
+        </div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          {Array.from({ length: 2 }, (_, i) => (
+            <Skeleton key={i} className="h-[180px]" />
+          ))}
+        </div>
+      </div>
+    );
+  }
   if (tab !== "tong-quan") {
     return (
       <div className="space-y-6" aria-busy="true" aria-label="Đang tải dữ liệu">
@@ -80,7 +97,6 @@ export default async function DashboardPage({
   // Whitelist 7|14|30 validate Ở SERVER trước khi gọi API (plan Nhóm 3): giá
   // trị lạ/thiếu -> 14, không tin thẳng query string người dùng gõ tay.
   const followupDays = parseFollowupDays(rawFollowupDays);
-  const tabInfo = DASHBOARD_TABS.find((t) => t.id === tab)!;
 
   return (
     <div className="space-y-6">
@@ -100,11 +116,7 @@ export default async function DashboardPage({
         ) : tab === "doanh-nghiep" ? (
           <CompaniesTab followupDays={followupDays} />
         ) : (
-          // Tab chưa làm (link có `?tab=` gõ tay/chia sẻ từ bản khác): báo rõ
-          // thay vì lặng lẽ rơi về "Tổng quan" khiến người xem tưởng đã mở đúng.
-          <div className="rounded-md border border-dashed p-6 text-center text-muted-foreground">
-            Tab &quot;{tabInfo.label}&quot; đang được chuyển sang giao diện mới, sẽ có ở đợt tiếp theo.
-          </div>
+          <MonthlyTab />
         )}
       </Suspense>
     </div>

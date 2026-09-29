@@ -13,7 +13,7 @@
 // Việt do frontend tự gắn.
 //
 // Phần 2/4 (Đợt 3.1): getStudentInsights(). Phần 3/4: getCompanyInsights().
-// getMonthlyInsights() thêm ở phần 4/4.
+// Phần 4/4: getMonthlyInsights().
 
 import { callAuthed } from "./client";
 import type { components } from "./types";
@@ -65,4 +65,29 @@ export type QuietCompanyRow = components["schemas"]["QuietCompanyRow"];
 export async function getCompanyInsights(followupDays: number): Promise<CompanyInsightsOut> {
   const qs = new URLSearchParams({ followup_days: String(followupDays) });
   return callAuthed<CompanyInsightsOut>(`/dashboard/insights/companies?${qs}`);
+}
+
+export type MonthlyInsightsOut = components["schemas"]["MonthlyInsightsOut"];
+export type TopIndustryRow = components["schemas"]["TopIndustryRow"];
+export type TopCompanyRow = components["schemas"]["TopCompanyRow"];
+
+/**
+ * GET /dashboard/insights/monthly — tab "Báo cáo tháng":
+ *   - jobs_new / companies_new: số job/công ty MỚI thu thập trong tháng này.
+ *   - jobs_expired: job có hạn nộp rơi trong tháng này VÀ đã qua.
+ *   - top_industries (tối đa 3) / top_companies (tối đa 5): nhiều job nhất
+ *     tháng này; `pct_change` của ngành so với tháng trước.
+ *   - applications_this_month / saved_jobs_this_month: lượt ứng tuyển/lưu job.
+ *   - `*_pct`: % chênh lệch so với tháng trước, BACKEND ĐÃ TÍNH SẴN (plan ghi
+ *     frontend tự tính từ /stats/engagement — không còn đúng). `null` khi
+ *     tháng trước = 0 (không chia được) -> nơi hiển thị phải ẩn huy hiệu %,
+ *     KHÔNG tự coi là 0.
+ *
+ * "Tháng" theo lịch giờ Việt Nam do backend tính (`this_month_start`/
+ * `last_month_start`, gồm cả phần engagement — lỗi date_trunc UTC ở Phụ lục F
+ * đã được sửa ở get_monthly_engagement_stats). Frontend KHÔNG tự tính lại ranh
+ * giới tháng cho tab này.
+ */
+export async function getMonthlyInsights(): Promise<MonthlyInsightsOut> {
+  return callAuthed<MonthlyInsightsOut>("/dashboard/insights/monthly");
 }

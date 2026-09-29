@@ -13,7 +13,7 @@ export const DASHBOARD_TABS = [
   { id: "tong-quan", label: "Tổng quan", ready: true },
   { id: "hoc-vien", label: "Gợi ý học viên", ready: true },
   { id: "doanh-nghiep", label: "Doanh nghiệp", ready: true },
-  { id: "bao-cao", label: "Báo cáo tháng", ready: false },
+  { id: "bao-cao", label: "Báo cáo tháng", ready: true },
 ] as const;
 
 export type DashboardTabId = (typeof DASHBOARD_TABS)[number]["id"];
