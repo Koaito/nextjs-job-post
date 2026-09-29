@@ -155,3 +155,17 @@ export async function createUser(data: {
     body: JSON.stringify(data),
   });
 }
+
+/**
+ * PATCH /auth/users/{id}/role — CHỈ admin. Backend trả 400 nếu id trùng
+ * chính admin đang gọi (chặn tự đổi role mình) — UI vẫn disable sẵn ở
+ * đúng dòng đó để khỏi round-trip vô ích (plan Nhóm 3). Nơi gọi tự
+ * requireAdmin() trước. Role có hiệu lực NGAY (get_current_user() ở
+ * backend đọc role mới nhất từ DB, không còn dựa vào JWT cũ).
+ */
+export async function updateUserRole(ssUserId: string, role: string): Promise<StaffUser> {
+  return callAuthed<StaffUser>(`/auth/users/${encodeURIComponent(ssUserId)}/role`, {
+    method: "PATCH",
+    body: JSON.stringify({ role }),
+  });
+}

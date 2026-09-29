@@ -33,6 +33,7 @@ export function NoteConfirmDialog({
   noteLabel = "Ghi chú (không bắt buộc)",
   notePlaceholder,
   noteRequired = false,
+  showNote = true,
   confirmLabel = "Xác nhận",
   cancelLabel = "Hủy",
   danger = false,
@@ -45,6 +46,9 @@ export function NoteConfirmDialog({
   noteLabel?: string;
   notePlaceholder?: string;
   noteRequired?: boolean;
+  /** false = chỉ xác nhận, KHÔNG có ô note (vd đổi role ở /staff-accounts
+   *  — backend không nhận note). onConfirm nhận "" và noteRequired bị bỏ qua. */
+  showNote?: boolean;
   confirmLabel?: string;
   cancelLabel?: string;
   danger?: boolean;
@@ -56,7 +60,7 @@ export function NoteConfirmDialog({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const trimmedEmpty = noteRequired && note.trim().length === 0;
+  const trimmedEmpty = showNote && noteRequired && note.trim().length === 0;
 
   // @base-ui/react/dialog tự gọi onOpenChange(false) khi bấm Esc/click
   // backdrop/nút X — reset state ở ĐÂY (1 chỗ duy nhất) thay vì phải
@@ -96,19 +100,21 @@ export function NoteConfirmDialog({
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
 
-        <label className="block text-sm">
-          <span className="font-medium">
-            {noteLabel}
-            {noteRequired && <span className="text-destructive"> *</span>}
-          </span>
-          <textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            rows={3}
-            placeholder={notePlaceholder}
-            className="mt-1.5 w-full rounded-md border px-3 py-2 text-sm"
-          />
-        </label>
+        {showNote && (
+          <label className="block text-sm">
+            <span className="font-medium">
+              {noteLabel}
+              {noteRequired && <span className="text-destructive"> *</span>}
+            </span>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={3}
+              placeholder={notePlaceholder}
+              className="mt-1.5 w-full rounded-md border px-3 py-2 text-sm"
+            />
+          </label>
+        )}
 
         {error && <p className="text-sm text-destructive">{error}</p>}
 

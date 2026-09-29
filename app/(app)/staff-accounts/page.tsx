@@ -3,7 +3,7 @@
 // — "Tài khoản team SS". Nhóm 3, Đợt 3.2, LÀM THEO TỪNG PHẦN:
 //   [x] Phần 1/4 — khung trang + bảng + lọc (CHỈ XEM, file này)
 //   [x] Phần 2/4 — /staff-accounts/add (tạo tài khoản, admin-only) + nút "＋ Thêm tài khoản"
-//   [ ] Phần 3/4 — đổi role (admin-only)
+//   [x] Phần 3/4 — đổi role (admin-only, có Dialog xác nhận)
 //   [ ] Phần 4/4 — khoá/mở tài khoản (admin-only)
 //
 // CHỈ STAFF (staff_required bên Flask): requireStaff() — ss_team xem được,
@@ -66,7 +66,7 @@ export default async function StaffAccountsPage() {
           {error}
         </p>
       ) : (
-        <StaffAccountsTable users={users} />
+        <StaffAccountsTable users={users} isAdmin={isAdmin} currentUserId={user.ss_user_id} />
       )}
     </div>
   );

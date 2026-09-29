@@ -1,10 +1,8 @@
 "use client";
 // app/(app)/staff-accounts/staff-accounts-table.tsx
-// Bảng + thanh lọc của /staff-accounts — Nhóm 3, Đợt 3.2 (Phần 1/4: CHỈ
-// xem + lọc, CHƯA có "+ Thêm tài khoản" / đổi role / khoá-mở — 3 việc đó
-// làm ở các phần sau, xem checklist ở page.tsx). Vì vậy bảng ở đây CHƯA có
-// cột hành động nào, kể cả với admin — khác hẳn bản Flask (vốn đã có sẵn
-// cả cột "Đổi role" ngay từ đầu vì làm 1 lần, không tách đợt).
+// Bảng + thanh lọc của /staff-accounts — Nhóm 3, Đợt 3.2. Phần 1/4: xem +
+// lọc. Phần 3/4: cột "Đổi role" (CHỈ admin thấy, kèm Dialog xác nhận).
+// Khoá/mở tài khoản là phần 4/4, sẽ thêm vào cùng cột này.
 //
 // Lọc HOÀN TOÀN client-side (KHÔNG round-trip server khi gõ/đổi filter) —
 // đúng ghi chú của plan Nhóm 3 Phần 3 (mục staff-accounts): toàn bộ tài
@@ -13,6 +11,10 @@
 // applyFilters() (JS thuần, show/hide <tr>) ở staff_accounts.html (Flask).
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { NoteConfirmDialog } from "@/components/note-confirm-dialog";
+import { updateStaffRoleAction } from "@/lib/actions/staff-account-actions";
 import { ROLE_LABELS } from "@/lib/constants";
 import { formatDateTimeVN } from "@/lib/date";
 import type { StaffUser } from "@/lib/api/auth";
@@ -25,7 +27,21 @@ function isStatusFilter(value: string): value is StatusFilter {
   return value === "" || value === "active" || value === "inactive";
 }
 
-export function StaffAccountsTable({ users }: { users: StaffUser[] }) {
+export function StaffAccountsTable({
+  users,
+  isAdmin,
+  currentUserId,
+}: {
+  users: StaffUser[];
+  /** Chỉ admin thấy cột "Đổi role" (server đã check lại ở action, đây chỉ là UI). */
+  isAdmin: boolean;
+  /** ss_user_id của admin đang đăng nhập — dòng này bị disable (plan Nhóm 3). */
+  currentUserId: string;
+}) {
+  const router = useRouter();
+  // Đổi role CHỜ xác nhận: select vẫn hiện role hiện tại (controlled bởi
+  // u.role) nên bấm Hủy tự động "trả lại" lựa chọn cũ, không cần reset tay.
+  const [pendingRole, setPendingRole] = useState<{ user: StaffUser; newRole: string } | null>(null);
   const [q, setQ] = useState("");
   const [role, setRole] = useState("");
   const [status, setStatus] = useState<StatusFilter>("");
@@ -97,6 +113,7 @@ export function StaffAccountsTable({ users }: { users: StaffUser[] }) {
               <th className="px-3 py-2 font-medium">Role</th>
               <th className="px-3 py-2 font-medium">Trạng thái</th>
               <th className="px-3 py-2 font-medium">Lần đăng nhập gần nhất</th>
+              {isAdmin && <th className="px-3 py-2 font-medium">Đổi role</th>}
             </tr>
           </thead>
           <tbody>
@@ -114,6 +131,40 @@ export function StaffAccountsTable({ users }: { users: StaffUser[] }) {
                 </td>
                 <td className="px-3 py-2">{u.is_active ? "Đang hoạt động" : "Đã vô hiệu hoá"}</td>
                 <td className="px-3 py-2 text-muted-foreground">{u.last_login_at ? formatDateTimeVN(u.last_login_at) : "Chưa từng đăng nhập"}</td>
+                {isAdmin && (
+                  <td className="px-3 py-2">
+                    {u.ss_user_id === currentUserId ? (
+                      <div className="flex items-center gap-2">
+                        <select
+                          disabled
+                          value={u.role}
+                          aria-label={`Đổi role của ${u.full_name}`}
+                          className="rounded-md border bg-background px-2 py-1 text-sm"
+                        >
+                          {ROLES.map((r) => (
+                            <option key={r} value={r}>
+                              {ROLE_LABELS[r]}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="text-xs text-muted-foreground">Tài khoản của bạn</span>
+                      </div>
+                    ) : (
+                      <select
+                        value={u.role}
+                        onChange={(e) => setPendingRole({ user: u, newRole: e.target.value })}
+                        aria-label={`Đổi role của ${u.full_name}`}
+                        className="rounded-md border bg-background px-2 py-1 text-sm"
+                      >
+                        {ROLES.map((r) => (
+                          <option key={r} value={r}>
+                            {ROLE_LABELS[r]}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -122,6 +173,35 @@ export function StaffAccountsTable({ users }: { users: StaffUser[] }) {
           <p className="p-4 text-center text-sm text-muted-foreground">Không có tài khoản nào khớp bộ lọc.</p>
         )}
       </div>
+
+      <NoteConfirmDialog
+        open={pendingRole !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingRole(null);
+        }}
+        showNote={false}
+        title="Đổi role tài khoản?"
+        description={
+          pendingRole && (
+            <>
+              Đổi role của <strong>{pendingRole.user.full_name}</strong> từ{" "}
+              <strong>{ROLE_LABELS[pendingRole.user.role] ?? pendingRole.user.role}</strong> →{" "}
+              <strong>{ROLE_LABELS[pendingRole.newRole] ?? pendingRole.newRole}</strong>? Quyền hạn của tài
+              khoản này thay đổi ngay.
+            </>
+          )
+        }
+        confirmLabel="Đổi role"
+        onConfirm={async () => {
+          if (!pendingRole) return { ok: false, message: "Không có thay đổi để lưu." };
+          const result = await updateStaffRoleAction(pendingRole.user.ss_user_id, pendingRole.newRole);
+          if (result.ok) {
+            toast.success(result.message);
+            router.refresh();
+          }
+          return result;
+        }}
+      />
     </div>
   );
 }
