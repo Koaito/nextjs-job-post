@@ -77,6 +77,41 @@ export async function listJobsCursor(
   return callPublic<PaginatedJobs>(`/jobs?${qs}`);
 }
 
+// Backend giới hạn limit<=200/lần gọi GET /jobs (api/routers/jobs.py:
+// Query(50, ge=1, le=200)); SAFETY_CAP chặn vòng lặp vô hạn nếu `total`
+// backend trả sai — khớp _MAX_JOBS_PAGE/_ALL_JOBS_SAFETY_CAP bên Flask
+// (crawler_client/jobs.py::list_all_jobs()).
+const MAX_JOBS_PAGE = 200;
+const ALL_JOBS_SAFETY_CAP = 5000;
+
+/**
+ * Mọi job 1 thành viên team SS đã TỰ NHẬP TAY (GET /jobs?created_by=<id>),
+ * gộp từ nhiều trang thành 1 mảng — dùng cho /profile/activity (Nhóm 5,
+ * Đợt 5.4; sau này /staff-activity/[id], Nhóm 3, dùng lại hàm này).
+ * Khớp list_all_jobs(created_by=uid) bên Flask: KHÔNG truyền `status` nên
+ * backend trả mọi trạng thái (cả job đã đóng) — khác buildJobQuery() ở trên
+ * vốn mặc định chỉ lấy OPEN cho trang chủ. Job crawl tự động (created_by
+ * NULL) không bao giờ khớp. Route PUBLIC -> callPublic, giống listJobs().
+ */
+export async function listAllJobsCreatedBy(ssUserId: string): Promise<JobOut[]> {
+  const all: JobOut[] = [];
+  let offset = 0;
+  // Cần `total` để biết khi nào dừng -> gọi 1 trang trước rồi mới quyết
+  // định có lặp tiếp không (cùng cách listAllCompanies()).
+  while (offset < ALL_JOBS_SAFETY_CAP) {
+    const qs = new URLSearchParams({
+      created_by: ssUserId,
+      limit: String(MAX_JOBS_PAGE),
+      offset: String(offset),
+    });
+    const page = await callPublic<PaginatedJobs>(`/jobs?${qs.toString()}`);
+    all.push(...page.items);
+    offset += MAX_JOBS_PAGE;
+    if (page.items.length === 0 || offset >= page.total) break;
+  }
+  return all;
+}
+
 export interface JobCardData {
   id: string;
   position: string;

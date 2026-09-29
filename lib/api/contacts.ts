@@ -79,6 +79,11 @@ export interface ContactListFilters {
   /** 1 trong CONTACT_STATUS_CODES (mã tiếng Anh, KHÔNG phải nhãn Việt). */
   status?: string;
   company_id?: string;
+  /** ss_user_id người TẠO contact (/profile/activity, /staff-activity/[id]).
+   *  Độc lập với assigned_ss_user. */
+  created_by?: string;
+  /** ss_user_id người đang PHỤ TRÁCH contact — có thể khác created_by. */
+  assigned_ss_user?: string;
 }
 
 /**
@@ -88,8 +93,9 @@ export interface ContactListFilters {
  * lại contact đã xoá mềm vào /companies/[companyId]). Backend KHÔNG
  * phân trang route này (trả thẳng mảng, không có `total`) — giống Flask.
  *
- * created_by/assigned_ss_user (backend có hỗ trợ) chưa dùng ở đây: chỉ
- * phục vụ /staff-activity/[id] (Nhóm 3).
+ * created_by/assigned_ss_user: 2 filter ĐỘC LẬP nhau, phục vụ
+ * /profile/activity (Nhóm 5, Đợt 5.4) và sau này /staff-activity/[id]
+ * (Nhóm 3). /contacts không truyền 2 tham số này.
  *
  * Yêu cầu role ss_team -> callAuthed. no-store đã là mặc định của
  * callAuthed (plan Nhóm 2: /contacts KHÔNG cache giữa các lần lọc).
@@ -99,6 +105,8 @@ export async function listAllContacts(filters: ContactListFilters = {}): Promise
   if (filters.status) params.set("contact_status", filters.status);
   if (filters.company_id) params.set("company_id", filters.company_id);
   if (filters.q) params.set("search", filters.q);
+  if (filters.created_by) params.set("created_by", filters.created_by);
+  if (filters.assigned_ss_user) params.set("assigned_ss_user", filters.assigned_ss_user);
   const qs = params.toString();
   return callAuthed<CompanyContactWithCompanyOut[]>(qs ? `/contacts?${qs}` : "/contacts");
 }

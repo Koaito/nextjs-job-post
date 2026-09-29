@@ -34,6 +34,28 @@ export async function listJobSavers(jobId: string): Promise<JobSaverOut[]> {
 }
 
 /**
+ * GET /jobs/applications/{application_id}/cv-url — staff lấy Signed URL
+ * (Supabase Storage, hạn dùng mặc định 1 giờ) để xem CV 1 học viên đã nộp.
+ * Plan Nhóm 5: route NẰM cùng nhóm hàm staff ở FILE NÀY (không phải
+ * lib/api/me.ts) dù trước đây route backend từng nằm dưới tiền tố /me —
+ * bản chất đây là staff xem hồ sơ NGƯỜI KHÁC, không phải "của tôi" (khớp
+ * comment dời route ở api/routers/jobs.py bên Scrap_JD). require_role(
+ * "ss_team") ở backend — page.tsx tự rẽ nhánh isStaff trước khi cho bấm
+ * nút gọi hàm này, không tự check quyền lại ở đây (cùng quy ước
+ * listJobApplicants()/listJobSavers() ở trên).
+ *
+ * KHÔNG cache/lưu lại kết quả — nơi gọi (getApplicantCvUrlAction) phải gọi
+ * lại hàm này mỗi lần thực sự cần mở CV (mỗi lần bấm "Xem CV"), để luôn
+ * nhận signed URL còn hiệu lực (plan Nhóm 5, mục ghi chú `cv-url`).
+ */
+export async function getApplicantCvUrl(applicationId: string): Promise<string> {
+  const res = await callAuthed<{ signed_url: string }>(
+    `/jobs/applications/${encodeURIComponent(applicationId)}/cv-url`,
+  );
+  return res.signed_url;
+}
+
+/**
  * GET /me/saved-jobs — dùng để biết TRƯỚC job nào học viên đã lưu, hiện
  * đúng trạng thái "đã lưu" ngay từ SSR (không đợi client tự gọi API rồi
  * mới cập nhật UI, tránh nháy trạng thái sai lúc mới load trang).

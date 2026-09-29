@@ -5,10 +5,11 @@
 // UI staff/học viên/khách, đúng cách jobs/page.tsx đã làm.
 //
 // Nhóm 5, Đợt 5.3: học viên nộp CV / huỷ ứng tuyển ngay ở aside
-// (<ApplySection>), `alreadyApplied` tính bên dưới. CHƯA làm: nút "Xem CV"
-// của staff (GET /jobs/applications/{id}/cv-url). Đã làm: applicants/savers
-// (staff), đổi trạng thái + đóng job (staff, note tuỳ chọn), save/unsave job
-// (học viên).
+// (<ApplySection>), `alreadyApplied` tính bên dưới. Đợt 5.4: nút "Xem CV"
+// của staff (<ViewCvButton>, gọi GET /jobs/applications/{id}/cv-url qua
+// server action mỗi lần bấm — không cache signed URL). Đã làm: applicants/
+// savers (staff), đổi trạng thái + đóng job (staff, note tuỳ chọn),
+// save/unsave job (học viên).
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -18,6 +19,7 @@ import { listJobApplicants, listJobSavers } from "@/lib/api/applications";
 import { listMyApplications } from "@/lib/api/me";
 import { JobStatusPanel } from "./job-status-panel";
 import { ApplySection } from "./apply-section";
+import { ViewCvButton } from "@/components/view-cv-button";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -173,6 +175,7 @@ export default async function JobDetailPage({
                         </p>
                         <p className="text-muted-foreground">Ứng tuyển: {formatDate(a.applied_at)}</p>
                         {a.note && <p className="text-muted-foreground">Ghi chú: {a.note}</p>}
+                        {a.cv_url && <ViewCvButton applicationId={a.application_id} />}
                       </li>
                     ))}
                   </ul>

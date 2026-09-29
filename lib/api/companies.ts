@@ -123,6 +123,32 @@ export async function createCompany(input: CreateCompanyInput): Promise<CreateCo
   return { company: toCompanyOption(raw), wasExisting: raw.was_existing };
 }
 
+/**
+ * Mọi công ty 1 thành viên team SS đã TỰ THÊM TAY (GET /companies?created_by=
+ * <id>), gộp nhiều trang thành 1 mảng — dùng cho /profile/activity (Nhóm 5,
+ * Đợt 5.4; /staff-activity/[id] ở Nhóm 3 sẽ dùng lại). Trả CompanyOut đầy
+ * đủ (cần industry/province_name/partnership_potential để hiện bảng),
+ * khác listAllCompanies() chỉ trả id/tên cho combobox. Công ty crawl tự
+ * động (created_by NULL) không bao giờ khớp. Route PUBLIC -> callPublic.
+ */
+export async function listAllCompaniesCreatedBy(ssUserId: string): Promise<CompanyOut[]> {
+  const all: CompanyOut[] = [];
+  let offset = 0;
+  while (offset < ALL_COMPANIES_SAFETY_CAP) {
+    const page = await callPublic<PaginatedCompanies>(
+      `/companies?${new URLSearchParams({
+        created_by: ssUserId,
+        limit: String(MAX_COMPANIES_PAGE),
+        offset: String(offset),
+      })}`,
+    );
+    all.push(...page.items);
+    offset += MAX_COMPANIES_PAGE;
+    if (page.items.length === 0 || offset >= page.total) break;
+  }
+  return all;
+}
+
 // ---------------------------------------------------------------------------
 // Nhóm 2, Phần 1 — /companies (list phân trang), /companies/[id] (detail),
 // /companies/[id]/edit, sửa nhanh "Tiềm năng" tại bảng danh sách.
