@@ -12,8 +12,8 @@
 // theo tên Flask (id/position/company). Backend chỉ trả mã/số, nhãn tiếng
 // Việt do frontend tự gắn.
 //
-// Phần 2/4 (Đợt 3.1): getStudentInsights(). 2 hàm còn lại (companies,
-// monthly) thêm ở phần 3/4 và 4/4.
+// Phần 2/4 (Đợt 3.1): getStudentInsights(). Phần 3/4: getCompanyInsights().
+// getMonthlyInsights() thêm ở phần 4/4.
 
 import { callAuthed } from "./client";
 import type { components } from "./types";
@@ -40,4 +40,29 @@ export type SalaryRangeRow = components["schemas"]["SalaryRangeRow"];
  */
 export async function getStudentInsights(): Promise<StudentInsightsOut> {
   return callAuthed<StudentInsightsOut>("/dashboard/insights/students");
+}
+
+export type CompanyInsightsOut = components["schemas"]["CompanyInsightsOut"];
+export type HighPotentialCompanyRow = components["schemas"]["HighPotentialCompanyRow"];
+export type FollowupContactRow = components["schemas"]["FollowupContactRow"];
+export type ExpandingCompanyRow = components["schemas"]["ExpandingCompanyRow"];
+export type QuietCompanyRow = components["schemas"]["QuietCompanyRow"];
+
+/**
+ * GET /dashboard/insights/companies?followup_days=N — tab "Doanh nghiệp":
+ *   - companies_no_contact: công ty tiềm năng CAO chưa có contact / contact
+ *     đã nguội >= 60 ngày (`reason` là MÃ, nhãn tiếng Việt gắn ở frontend).
+ *   - contacts_needing_followup: contact chưa "Đang hợp tác" im lặng >=
+ *     followup_days (backend trả `quiet_days`/`never_contacted` sẵn).
+ *   - companies_expanding: >= 2 job mới trong 30 ngày (kèm tối đa 5 tên job).
+ *   - companies_quiet: job gần nhất cách đây > 75 ngày.
+ *
+ * `followupDays` PHẢI nằm trong whitelist 7|14|30 — backend trả 400 với giá
+ * trị lạ (khác Flask lặng lẽ rơi về 14). Nơi gọi validate trước bằng
+ * parseFollowupDays() (lib/dashboard/companies.ts), KHÔNG truyền thẳng
+ * query string người dùng gõ tay.
+ */
+export async function getCompanyInsights(followupDays: number): Promise<CompanyInsightsOut> {
+  const qs = new URLSearchParams({ followup_days: String(followupDays) });
+  return callAuthed<CompanyInsightsOut>(`/dashboard/insights/companies?${qs}`);
 }

@@ -13,16 +13,22 @@
 //   - `?tab=` được server đọc khi render trang (page.tsx) nên link chia sẻ
 //     mở đúng tab người gửi đang xem.
 //   - scroll: false để không nhảy lên đầu trang khi đổi tab.
+//   - `?followup_days=` (ô chọn của tab Doanh nghiệp) được GIỮ khi đổi tab,
+//     như Flask (url.searchParams.set("tab") chỉ đổi đúng 1 tham số) — chọn
+//     30 ngày rồi sang tab khác và quay lại vẫn còn 30. Chỉ giữ giá trị đã
+//     qua whitelist, không chép nguyên query string.
 //   - useOptimistic + transition: tab vừa bấm sáng ngay, không đợi server
 //     trả dữ liệu tab mới (lúc đó nội dung cũ vẫn hiện, aria-busy báo bận).
 
 import { useOptimistic, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { FOLLOWUP_DAYS_DEFAULT, parseFollowupDays } from "@/lib/dashboard/companies";
 import { DASHBOARD_TABS, type DashboardTabId } from "./dashboard-tabs";
 
 export function DashboardTabBar({ active }: { active: DashboardTabId }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [optimisticActive, setOptimisticActive] = useOptimistic(active);
 
@@ -30,7 +36,11 @@ export function DashboardTabBar({ active }: { active: DashboardTabId }) {
     if (id === optimisticActive) return;
     startTransition(() => {
       setOptimisticActive(id);
-      router.replace(`/dashboard?tab=${id}`, { scroll: false });
+      const rawFollowup = searchParams.get("followup_days");
+      const followup = rawFollowup === null ? null : parseFollowupDays(rawFollowup);
+      // Giá trị lạ đã bị parse về mặc định -> khỏi ghi lại vào URL.
+      const suffix = followup !== null && followup !== FOLLOWUP_DAYS_DEFAULT ? `&followup_days=${followup}` : "";
+      router.replace(`/dashboard?tab=${id}${suffix}`, { scroll: false });
     });
   }
 

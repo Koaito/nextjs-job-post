@@ -4,7 +4,7 @@
 // plan, LÀM THEO TỪNG PHẦN (mỗi phần 1 tab):
 //   [x] Phần 1/4 — khung trang + tab "Tổng quan"   (file này + overview-tab.tsx)
 //   [x] Phần 2/4 — tab "Gợi ý học viên"          (students-tab.tsx)
-//   [ ] Phần 3/4 — tab "Doanh nghiệp" (kèm `?followup_days=7|14|30`)
+//   [x] Phần 3/4 — tab "Doanh nghiệp" (kèm `?followup_days=7|14|30`) (companies-tab.tsx)
 //   [ ] Phần 4/4 — tab "Báo cáo tháng"
 //
 // CHỈ STAFF (staff_required bên Flask): requireStaff() ở đầu trang. Học
@@ -24,7 +24,9 @@ import { Suspense } from "react";
 import { requireStaff } from "@/lib/auth-guard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DashboardTabBar } from "./dashboard-tab-bar";
+import { parseFollowupDays } from "@/lib/dashboard/companies";
 import { DASHBOARD_TABS, parseDashboardTab, type DashboardTabId } from "./dashboard-tabs";
+import { CompaniesTab } from "./companies-tab";
 import { OverviewTab } from "./overview-tab";
 import { StudentsTab } from "./students-tab";
 
@@ -70,11 +72,14 @@ function TabSkeleton({ tab }: { tab: DashboardTabId }) {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string | string[] }>;
+  searchParams: Promise<{ tab?: string | string[]; followup_days?: string | string[] }>;
 }) {
   await requireStaff();
-  const { tab: rawTab } = await searchParams;
+  const { tab: rawTab, followup_days: rawFollowupDays } = await searchParams;
   const tab = parseDashboardTab(rawTab);
+  // Whitelist 7|14|30 validate Ở SERVER trước khi gọi API (plan Nhóm 3): giá
+  // trị lạ/thiếu -> 14, không tin thẳng query string người dùng gõ tay.
+  const followupDays = parseFollowupDays(rawFollowupDays);
   const tabInfo = DASHBOARD_TABS.find((t) => t.id === tab)!;
 
   return (
@@ -87,11 +92,13 @@ export default async function DashboardPage({
 
       <DashboardTabBar active={tab} />
 
-      <Suspense key={tab} fallback={<TabSkeleton tab={tab} />}>
+      <Suspense key={tab === "doanh-nghiep" ? `${tab}-${followupDays}` : tab} fallback={<TabSkeleton tab={tab} />}>
         {tab === "tong-quan" ? (
           <OverviewTab />
         ) : tab === "hoc-vien" ? (
           <StudentsTab />
+        ) : tab === "doanh-nghiep" ? (
+          <CompaniesTab followupDays={followupDays} />
         ) : (
           // Tab chưa làm (link có `?tab=` gõ tay/chia sẻ từ bản khác): báo rõ
           // thay vì lặng lẽ rơi về "Tổng quan" khiến người xem tưởng đã mở đúng.
