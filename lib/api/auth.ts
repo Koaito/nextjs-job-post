@@ -134,3 +134,24 @@ export async function listStaffUsers(): Promise<StaffUser[]> {
 export async function listAllUsers(): Promise<StaffUser[]> {
   return callAuthed<StaffUser[]>("/auth/users");
 }
+
+export type UserCreatedOut = components["schemas"]["UserCreatedOut"];
+
+/**
+ * POST /auth/users — CHỈ admin (require_admin ở backend). Trả về
+ * UserCreatedOut kèm `temp_password`: mật khẩu tạm do backend tự sinh, CHỈ
+ * xuất hiện trong response này (backend chỉ lưu hash, không endpoint nào
+ * lấy lại được). Nơi gọi tuyệt đối KHÔNG được log/cache/lưu lại giá trị
+ * này ở đâu ngoài state client của trang /staff-accounts/add (plan Nhóm 3).
+ * Nơi gọi tự requireAdmin() + tự chuẩn hoá đầu vào (trim/lowercase) trước.
+ */
+export async function createUser(data: {
+  full_name: string;
+  email: string;
+  role: string;
+}): Promise<UserCreatedOut> {
+  return callAuthed<UserCreatedOut>("/auth/users", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}

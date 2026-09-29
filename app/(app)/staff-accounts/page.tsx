@@ -2,7 +2,7 @@
 // Tương đương staff_accounts.html + blueprints/staff.py::accounts() (Flask)
 // — "Tài khoản team SS". Nhóm 3, Đợt 3.2, LÀM THEO TỪNG PHẦN:
 //   [x] Phần 1/4 — khung trang + bảng + lọc (CHỈ XEM, file này)
-//   [ ] Phần 2/4 — /staff-accounts/add (tạo tài khoản, admin-only)
+//   [x] Phần 2/4 — /staff-accounts/add (tạo tài khoản, admin-only) + nút "＋ Thêm tài khoản"
 //   [ ] Phần 3/4 — đổi role (admin-only)
 //   [ ] Phần 4/4 — khoá/mở tài khoản (admin-only)
 //
@@ -12,7 +12,9 @@
 // trực tiếp tới việc đăng nhập được hay không, cần luôn thấy số liệu mới
 // nhất khi vào trang, không dựa vào cache trang cũ.
 
+import Link from "next/link";
 import { requireStaff } from "@/lib/auth-guard";
+import { buttonVariants } from "@/components/ui/button";
 import { listAllUsers } from "@/lib/api/auth";
 import { StaffAccountsTable } from "./staff-accounts-table";
 
@@ -23,7 +25,8 @@ export const metadata = {
 };
 
 export default async function StaffAccountsPage() {
-  await requireStaff();
+  const user = await requireStaff();
+  const isAdmin = user.role === "admin";
 
   let users: Awaited<ReturnType<typeof listAllUsers>> = [];
   let error: string | null = null;
@@ -35,13 +38,28 @@ export default async function StaffAccountsPage() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <span className="text-sm text-muted-foreground">Career Hub / Quản trị</span>
-        <h1 className="font-heading text-3xl font-semibold">Tài khoản team SS</h1>
-        <p className="mt-1 max-w-2xl text-muted-foreground">
-          Danh sách toàn bộ tài khoản đăng nhập qua backend (gồm cả học viên tự đăng ký).
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <span className="text-sm text-muted-foreground">Career Hub / Quản trị</span>
+          <h1 className="font-heading text-3xl font-semibold">Tài khoản team SS</h1>
+          <p className="mt-1 max-w-2xl text-muted-foreground">
+            Danh sách toàn bộ tài khoản đăng nhập qua backend (gồm cả học viên tự đăng ký). Chỉ tài khoản{" "}
+            <strong>admin</strong> mới tạo được tài khoản mới hoặc đổi role người khác.
+          </p>
+        </div>
+        {isAdmin && (
+          <Link href="/staff-accounts/add" className={buttonVariants()}>
+            ＋ Thêm tài khoản
+          </Link>
+        )}
       </header>
+
+      {!isAdmin && (
+        <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          Bạn đang xem ở chế độ chỉ đọc (role hiện tại: <strong>{user.role}</strong>) — chỉ tài khoản{" "}
+          <strong>admin</strong> mới tạo tài khoản mới hoặc đổi role người khác.
+        </p>
+      )}
 
       {error ? (
         <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
