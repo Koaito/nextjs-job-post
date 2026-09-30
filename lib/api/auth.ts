@@ -8,6 +8,7 @@
 import type { BackendUser, TokenPair } from "@/lib/api/types-manual";
 import { ApiError, callAuthed } from "@/lib/api/client";
 import type { components } from "@/lib/api/types";
+import { getClientIpHeaders } from "@/lib/client-ip-server";
 
 const BASE_URL = process.env.CRAWLER_API_URL;
 const API_KEY = process.env.CRAWLER_API_KEY;
@@ -18,6 +19,9 @@ async function authRawFetch<T>(path: string, init: RequestInit): Promise<T> {
     headers: {
       "Content-Type": "application/json",
       "X-API-Key": API_KEY!,
+      // IP thật của người dùng cuối cho rate limit /auth/login, /auth/refresh
+      // (plan Phần 1 mục 3.14, xem lib/client-ip.ts).
+      ...(await getClientIpHeaders()),
       ...init.headers,
     },
     cache: "no-store",

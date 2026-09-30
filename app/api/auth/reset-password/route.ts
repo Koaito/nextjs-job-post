@@ -10,6 +10,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { verifyOrigin } from "@/lib/verify-origin";
+import { clientIpHeaders } from "@/lib/client-ip";
 
 const BASE_URL = process.env.CRAWLER_API_URL;
 const API_KEY = process.env.CRAWLER_API_KEY;
@@ -50,7 +51,13 @@ export async function POST(req: NextRequest) {
   try {
     const res = await fetch(`${BASE_URL}/auth/reset-password`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-API-Key": API_KEY! },
+      headers: {
+        "Content-Type": "application/json",
+        "X-API-Key": API_KEY!,
+        // IP thật của người dùng cuối cho rate limit theo IP ở backend
+        // (plan Phần 1 mục 3.14, xem lib/client-ip.ts).
+        ...clientIpHeaders(req.headers),
+      },
       body: JSON.stringify({ token, new_password: newPassword }),
       cache: "no-store",
     });

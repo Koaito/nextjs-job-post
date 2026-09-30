@@ -38,6 +38,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { isExpiredSoon } from "@/lib/jwt";
+import { clientIpHeaders } from "@/lib/client-ip";
 import {
   ACCESS_COOKIE,
   REFRESH_COOKIE,
@@ -84,13 +85,20 @@ type RefreshResult =
  *     lib/api/client.ts::callAuthed, chỉ xoá cookie khi refresh XÁC NHẬN
  *     token sai, không xoá vì lỗi hạ tầng).
  */
-async function tryRefresh(refreshToken: string): Promise<RefreshResult> {
+async function tryRefresh(
+  refreshToken: string,
+  reqHeaders: Headers,
+): Promise<RefreshResult> {
   try {
     const res = await fetch(`${process.env.CRAWLER_API_URL}/auth/refresh`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "X-API-Key": process.env.CRAWLER_API_KEY!,
+        // IP thật của người dùng cuối cho rate limit /auth/refresh (plan
+        // Phần 1 mục 3.14). Middleware không dùng được next/headers nên
+        // đọc thẳng từ request.
+        ...clientIpHeaders(reqHeaders),
       },
       body: JSON.stringify({ refresh_token: refreshToken }),
       cache: "no-store",
@@ -124,7 +132,7 @@ export async function middleware(req: NextRequest) {
   const needsRefresh = refreshToken !== null && (!accessToken || isExpiredSoon(accessToken));
 
   if (needsRefresh) {
-    const result = await tryRefresh(refreshToken!);
+    const result = await tryRefresh(refreshToken!, req.headers);
     if (result.ok) {
       newTokens = { access: result.accessToken, refresh: result.refreshToken };
       accessToken = result.accessToken;

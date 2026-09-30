@@ -5,6 +5,7 @@
 // không tự viết logic refresh riêng ở bất kỳ đâu khác.
 
 import { getValidAccessToken, forceRefreshAccessToken } from "@/lib/session";
+import { getClientIpHeaders } from "@/lib/client-ip-server";
 
 export class ApiError extends Error {
   constructor(
@@ -38,11 +39,21 @@ async function rawFetch<T>(
   // form. Mọi body khác vẫn mặc định JSON như cũ.
   const isFormData = typeof FormData !== "undefined" && init.body instanceof FormData;
 
+  // IP thật của người dùng cuối cho rate limit theo IP ở backend (plan
+  // Phần 1 mục 3.14, xem lib/client-ip.ts). BỎ QUA với lời gọi có cache
+  // (`next: { revalidate }` hoặc cache khác "no-store", vd /enums): header
+  // nằm trong khoá cache của fetch, gắn IP mỗi người vào sẽ tách cache
+  // thành từng mảnh theo người dùng; và lời gọi được cache dùng chung
+  // cho mọi người nên không cần khoá theo IP.
+  const isCached = init.next?.revalidate !== undefined || (init.cache ?? "no-store") !== "no-store";
+  const clientIp = isCached ? {} : await getClientIpHeaders();
+
   const res = await fetch(`${process.env.CRAWLER_API_URL}${path}`, {
     ...init,
     headers: {
       ...(isFormData ? {} : { "Content-Type": "application/json" }),
       "X-API-Key": process.env.CRAWLER_API_KEY!,
+      ...clientIp,
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...init.headers,
     },
