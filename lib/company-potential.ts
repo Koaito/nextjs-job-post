@@ -26,7 +26,10 @@ const ENTRY_LEVELS = new Set(["Intern", "Fresher", "Junior"]);
 
 const RESPONDED_STATUSES = new Set(["RESPONDED", "IN_PARTNERSHIP"]);
 
-const HN_HCM = new Set(["Hà Nội", "TP. Hồ Chí Minh"]);
+// Tên phải khớp bảng provinces ("Hồ Chí Minh", KHÔNG có "TP."). Bản cũ so
+// với "TP. Hồ Chí Minh" nên công ty HCM không bao giờ được tính tiêu chí
+// này. "TP. Hồ Chí Minh" giữ lại chỉ để phòng dữ liệu cũ/nhập tay.
+const HN_HCM = new Set(["Hà Nội", "Hồ Chí Minh", "TP. Hồ Chí Minh"]);
 
 // Ngưỡng quy đổi tổng điểm (0-5) -> mức gợi ý — khớp _HIGH_THRESHOLD/
 // _MEDIUM_THRESHOLD bên Flask.

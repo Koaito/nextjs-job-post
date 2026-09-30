@@ -178,10 +178,11 @@ export async function listAllCompanyRecords(): Promise<CompanyOut[]> {
 
 export interface CompanyFilters {
   q?: string;
-  /** Tên tỉnh/thành — dropdown filter dùng CITIES_VN TĨNH (đã chốt với
-   *  user, không gọi round-trip list_company_cities() như Flask), gửi
-   *  thẳng lên query `province` (khớp list_companies() bên FastAPI —
-   *  lọc theo kiểu chứa chuỗi/ILIKE, không phải enum chặt). */
+  /** Tên tỉnh/thành — dropdown filter dùng CITIES_VN TĨNH (34 tỉnh sau
+   *  sáp nhập + "Khác", không gọi round-trip list_company_cities() như
+   *  Flask), gửi thẳng lên query `province`. Backend so sánh BẰNG
+   *  (`p.province_name = %s` trong list_companies()), KHÔNG phải ILIKE —
+   *  nên giá trị phải trùng từng ký tự với bảng provinces. */
   city?: string;
 }
 

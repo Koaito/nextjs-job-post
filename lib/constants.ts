@@ -16,29 +16,34 @@ export const INDUSTRIES = [
 
 export const TRACK_OTHER = "Khác / Chưa xác định";
 
-// 63 tỉnh/thành — copy Y HỆT CITIES_VN trong constants.py bên Flask
-// (backend chưa cập nhật theo đợt sáp nhập tỉnh 2025, GET /companies
-// filter province_name theo kiểu chứa chuỗi/ILIKE chứ không phải enum
-// chặt ở DB — giữ đúng danh sách backend/Flask đang dùng thật, không
-// tự "sửa cho đúng" theo địa giới hành chính hiện tại, tránh gửi lên
-// giá trị mà dữ liệu cũ trong DB không có). Dùng cho field "Thành phố"
-// của company (CompanyCombobox mục tạo mới, CompanyForm ở Nhóm 2) —
-// KHÁC hẳn danh sách tỉnh của JOB (lib/api/enums.ts::getProvinceNames).
+// 34 tỉnh/thành sau sáp nhập (Nghị quyết 202/2025/QH15, hiệu lực
+// 01/7/2025) — khớp TUYỆT ĐỐI với bảng `provinces` bên backend (seed ở
+// sql/migration_update_provinces_2025.sql). GET /companies lọc bằng
+// `p.province_name = %s` (so sánh bằng, KHÔNG phải ILIKE), nên chỉ cần
+// lệch 1 ký tự (vd "TP. Hồ Chí Minh" thay vì "Hồ Chí Minh", "Thừa Thiên
+// Huế" thay vì "Huế") là filter ra 0 công ty. Bản 63 tên cũ từng gây đúng
+// lỗi này, đã thay bằng danh sách dưới.
+// Ghi tên tỉnh CŨ (vd "Bình Dương") vào form vẫn an toàn: backend tự quy
+// đổi về tỉnh mới qua province_alias.py, không cần liệt kê ở đây.
+// Dùng cho field "Thành phố" của company (CompanyCombobox mục tạo mới,
+// CompanyForm) và dropdown lọc /companies — KHÁC hẳn danh sách tỉnh của
+// JOB (lib/api/enums.ts::getProvinceNames).
+// Thứ tự: 6 thành phố trực thuộc trung ương trước, 28 tỉnh còn lại theo
+// bảng chữ cái tiếng Việt.
 export const CITIES_VN = [
-  "Hà Nội", "TP. Hồ Chí Minh", "Đà Nẵng", "Cần Thơ", "Hải Phòng",
-  "An Giang", "Bà Rịa - Vũng Tàu", "Bắc Giang", "Bắc Kạn", "Bạc Liêu",
-  "Bắc Ninh", "Bến Tre", "Bình Định", "Bình Dương", "Bình Phước",
-  "Bình Thuận", "Cà Mau", "Cao Bằng", "Đắk Lắk", "Đắk Nông",
-  "Điện Biên", "Đồng Nai", "Đồng Tháp", "Gia Lai", "Hà Giang",
-  "Hà Nam", "Hà Tĩnh", "Hải Dương", "Hậu Giang", "Hòa Bình",
-  "Hưng Yên", "Khánh Hòa", "Kiên Giang", "Kon Tum", "Lai Châu",
-  "Lâm Đồng", "Lạng Sơn", "Lào Cai", "Long An", "Nam Định",
-  "Nghệ An", "Ninh Bình", "Ninh Thuận", "Phú Thọ", "Phú Yên",
-  "Quảng Bình", "Quảng Nam", "Quảng Ngãi", "Quảng Ninh", "Quảng Trị",
-  "Sóc Trăng", "Sơn La", "Tây Ninh", "Thái Bình", "Thái Nguyên",
-  "Thanh Hóa", "Thừa Thiên Huế", "Tiền Giang", "Trà Vinh", "Tuyên Quang",
-  "Vĩnh Long", "Vĩnh Phúc", "Yên Bái",
+  "Hà Nội", "Hồ Chí Minh", "Đà Nẵng", "Hải Phòng", "Cần Thơ", "Huế",
+  "An Giang", "Bắc Ninh", "Cà Mau", "Cao Bằng", "Đắk Lắk",
+  "Điện Biên", "Đồng Nai", "Đồng Tháp", "Gia Lai", "Hà Tĩnh",
+  "Hưng Yên", "Khánh Hòa", "Lai Châu", "Lâm Đồng", "Lạng Sơn",
+  "Lào Cai", "Nghệ An", "Ninh Bình", "Phú Thọ", "Quảng Ngãi",
+  "Quảng Ninh", "Quảng Trị", "Sơn La", "Tây Ninh", "Thái Nguyên",
+  "Thanh Hóa", "Tuyên Quang", "Vĩnh Long",
 ] as const;
+
+// Giá trị đặc biệt có trong bảng `provinces` (công ty chưa rõ địa điểm).
+// CHỈ dùng cho dropdown LỌC — form tạo/sửa không cho chọn, để trống
+// "— Chưa rõ —" thì backend tự xếp vào "Khác".
+export const CITY_OTHER = "Khác";
 
 // Khớp ĐÚNG ROLE_LABELS trong constants.py bên Flask ("Team SS", không
 // phải "SS Team" — thứ tự chữ khác nhau, dễ gõ nhầm vì đọc xuôi tai

@@ -5,9 +5,9 @@
 // KHÔNG public như /jobs (dù GET /companies bên FastAPI không đòi role,
 // toàn bộ khu vực quản lý công ty vẫn staff-only ở tầng Next.js).
 //
-// Dropdown "Tỉnh/Thành" để LỌC dùng CITIES_VN TĨNH (đã chốt với user) —
-// KHÁC Flask (list_company_cities() quét DB lấy đúng tỉnh đang có), nên
-// có thể hiện tỉnh 0 kết quả.
+// Dropdown "Tỉnh/Thành" để LỌC dùng CITIES_VN TĨNH (34 tỉnh sau sáp nhập
+// + "Khác") — KHÁC Flask (list_company_cities() quét DB lấy đúng tỉnh
+// đang có), nên có thể hiện tỉnh 0 kết quả.
 
 import Link from "next/link";
 import { requireStaff } from "@/lib/auth-guard";

@@ -2,14 +2,14 @@
 // app/(app)/companies/filter-bar.tsx
 // Cùng pattern app/(app)/jobs/filter-bar.tsx (Nhóm 1) — search-as-you-type
 // debounce cho q, dropdown áp dụng ngay. Khác jobs/filter-bar.tsx ở chỗ
-// dropdown "Tỉnh/Thành" dùng CITIES_VN TĨNH (quyết định đã chốt với user
-// — Flask quét DB lấy đúng tỉnh đang có bằng list_company_cities(), tốn
-// round-trip riêng; Next.js chấp nhận có thể hiện tỉnh 0 kết quả để đơn
-// giản, không thêm round-trip).
+// dropdown "Tỉnh/Thành" dùng CITIES_VN TĨNH (34 tỉnh sau sáp nhập, khớp
+// bảng provinces) + "Khác" — không gọi round-trip list_company_cities()
+// như Flask, nên có thể hiện tỉnh 0 kết quả nhưng KHÔNG còn tên nào lệch
+// với DB (lỗi cũ: list 63 tên khiến "TP. Hồ Chí Minh" luôn ra 0 công ty).
 
 import { useRef, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { CITIES_VN } from "@/lib/constants";
+import { CITIES_VN, CITY_OTHER } from "@/lib/constants";
 import { withCurrentOption } from "@/lib/utils";
 
 const DEBOUNCE_MS = 300;
@@ -65,7 +65,7 @@ export function CompanyFilterBar() {
         className="rounded-md border px-3 py-2 text-sm"
       >
         <option value="">Mọi tỉnh/thành</option>
-        {withCurrentOption([...CITIES_VN], city).map((c) => (
+        {withCurrentOption([...CITIES_VN, CITY_OTHER], city).map((c) => (
           <option key={c} value={c}>
             {c}
           </option>
