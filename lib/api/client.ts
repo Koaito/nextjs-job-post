@@ -45,7 +45,8 @@ async function rawFetch<T>(
   // nằm trong khoá cache của fetch, gắn IP mỗi người vào sẽ tách cache
   // thành từng mảnh theo người dùng; và lời gọi được cache dùng chung
   // cho mọi người nên không cần khoá theo IP.
-  const isCached = init.next?.revalidate !== undefined || (init.cache ?? "no-store") !== "no-store";
+  const hasRevalidate = init.next?.revalidate !== undefined;
+  const isCached = hasRevalidate || (init.cache ?? "no-store") !== "no-store";
   const clientIp = isCached ? {} : await getClientIpHeaders();
 
   const res = await fetch(`${process.env.CRAWLER_API_URL}${path}`, {
@@ -61,7 +62,14 @@ async function rawFetch<T>(
     // Từng lời gọi cụ thể ở lib/api/jobs.ts... có thể override nếu cần
     // ISR (revalidate: 60) hoặc cache enum (revalidate: 300) — xem Phần 4
     // mục 4 của plan.
-    cache: init.cache ?? "no-store",
+    //
+    // KHÔNG đặt `cache` khi caller đã truyền `next.revalidate`: Next.js
+    // coi 2 tuỳ chọn này xung đột (cảnh báo `Specified "cache: no-store"
+    // and "revalidate: 300", only one should be specified`) và bỏ qua
+    // revalidate -> /enums bị gọi lại backend ở MỌI lần render thay vì
+    // cache 5 phút như plan. `...init` ở trên đã mang sẵn `cache` nếu
+    // caller tự truyền.
+    ...(hasRevalidate ? {} : { cache: init.cache ?? "no-store" }),
   });
 
   if (!res.ok) {

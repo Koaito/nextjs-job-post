@@ -65,7 +65,16 @@ export default async function CompaniesPage({
   }
 
   const companies = data.items;
-  const signals = await getPartnershipSignals(companies.map((c) => c.company_id));
+  // Signals chỉ phục vụ badge "Tiềm năng hợp tác" — dữ liệu PHỤ. Lỗi ở
+  // endpoint này (đã từng: 500 do SQL `uuid = text`) không được làm sập
+  // cả bảng công ty. Rơi về {} (mọi tín hiệu = false, đúng quy ước của
+  // getPartnershipSignals) và log ra server để lỗi không bị nuốt im lặng.
+  let signals: Awaited<ReturnType<typeof getPartnershipSignals>> = {};
+  try {
+    signals = await getPartnershipSignals(companies.map((c) => c.company_id));
+  } catch (err) {
+    console.error("[companies] Không lấy được partnership-signals, hiện bảng không kèm gợi ý:", err);
+  }
 
   const from = companies.length ? offset + 1 : 0;
   const to = offset + companies.length;
