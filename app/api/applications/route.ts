@@ -11,7 +11,7 @@
 // có xử lý riêng cho trường hợp này (xem components/apply-job-dialog.tsx).
 //
 // Route mutation dựa cookie -> BẮT BUỘC verifyOrigin() (Phần 2 mục 6).
-// Hết phiên -> 401 JSON thật, không redirect (middleware loại /api/*).
+// Hết phiên -> 401 JSON thật, không redirect (proxy.ts loại /api/*).
 //
 // Ứng tuyển trùng (409) KHÔNG phải lỗi: trả ok:true + alreadyApplied để UI
 // hiện toast thành công "Bạn đã ứng tuyển job này rồi." (plan Nhóm 5).

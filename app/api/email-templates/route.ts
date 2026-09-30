@@ -9,7 +9,7 @@
 //
 // GET chỉ ĐỌC -> không gọi verifyOrigin() (plan Phần 2 mục 6 chỉ bắt buộc
 // cho route mutation). Cùng khuôn với /api/messages/unread-count:
-//   - hết phiên -> 401 JSON thật, không redirect (middleware.ts đã loại
+//   - hết phiên -> 401 JSON thật, không redirect (proxy.ts đã loại
 //     /api/* khỏi matcher);
 //   - tự set Cache-Control: no-store trên response của CHÍNH route này;
 //   - route chỉ dành cho staff: role "user" nhận 403 (backend cũng chặn

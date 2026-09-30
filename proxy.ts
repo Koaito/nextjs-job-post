@@ -1,9 +1,9 @@
 // proxy.ts
 // (Đổi tên từ middleware.ts theo Next.js 16: convention "middleware" đã
 // deprecated, thay bằng "proxy" — hàm export đổi tên middleware -> proxy,
-// logic giữ nguyên. Lưu ý: proxy chạy Node.js runtime, KHÔNG còn là Edge
-// như comment "Edge" bên dưới còn ghi từ trước; code ở đây chỉ dùng
-// fetch/NextResponse nên chạy được ở cả hai.)
+// logic giữ nguyên. Proxy chạy Node.js runtime, KHÔNG còn là Edge. Các
+// comment bên dưới đã đổi "middleware" -> "proxy"; lịch sử các round cũ
+// ở chat237-239.txt vẫn dùng từ "middleware".)
 // ROUND SỬA REFRESH (chat237.txt phát hiện bug, chốt hướng ở
 // chat238.txt/chat239.txt) — thay cho bản cũ "chỉ chặn sớm theo cookie".
 //
@@ -19,19 +19,19 @@
 // bị văng đăng xuất oan — và lỗi này tăng dần theo số Server Component
 // gọi song song (Round 6, Nhóm 2-6 sắp làm sẽ càng lộ rõ).
 //
-// Hướng B (chốt dùng): middleware — nơi DUY NHẤT chạy trước mọi render
+// Hướng B (chốt dùng): proxy — nơi DUY NHẤT chạy trước mọi render
 // VÀ được phép ghi cookie response — tự gọi /auth/refresh khi access
 // token hết hạn/sắp hết hạn, ghi lại cookie mới, trước khi cho request
 // đi tiếp. Vẫn giữ đúng tinh thần "refresh chỉ 1 nơi" của plan (chỉ đổi
 // vị trí từ lib/session.ts sang đây) — lib/session.ts::getValidAccessToken()
-// giữ nguyên logic cũ, trở thành lớp dự phòng hiếm khi chạy (middleware bị
+// giữ nguyên logic cũ, trở thành lớp dự phòng hiếm khi chạy (proxy bị
 // skip do matcher, hoặc token hết hạn ngay giữa lúc render).
 //
-// Middleware chạy Edge runtime -> không dùng được next/headers (lib/
-// session.ts), nên phần "decode JWT exp" dùng chung qua lib/jwt.ts (không
-// đụng next/headers, chạy được cả Edge lẫn Node), còn phần gọi
+// Proxy không dùng được next/headers (lib/session.ts import nó, chỉ hợp lệ
+// khi render Server Component/Route Handler), nên phần "decode JWT exp"
+// dùng chung qua lib/jwt.ts (không đụng next/headers), còn phần gọi
 // /auth/refresh gọi thẳng fetch() riêng ở đây (KHÔNG import lib/api/
-// auth.ts để tránh kéo theo phụ thuộc không tương thích Edge).
+// auth.ts để proxy không kéo theo phụ thuộc vào ngữ cảnh render).
 //
 // Phạm vi áp dụng: MỌI route (kể cả /jobs, /jobs/[id] công khai) — route
 // public vẫn gọi getCurrentUser() ở layout để hiện nút "Thêm job"/"Lưu
@@ -101,7 +101,7 @@ async function tryRefresh(
         "Content-Type": "application/json",
         "X-API-Key": process.env.CRAWLER_API_KEY!,
         // IP thật của người dùng cuối cho rate limit /auth/refresh (plan
-        // Phần 1 mục 3.14). Middleware không dùng được next/headers nên
+        // Phần 1 mục 3.14). Proxy không dùng được next/headers nên
         // đọc thẳng từ request.
         ...clientIpHeaders(reqHeaders),
       },
@@ -214,7 +214,7 @@ export const config = {
   matcher: [
     // Áp dụng cho mọi route trừ static file, ảnh, favicon, API Route
     // Handler nội bộ của Next.js (_next/*) — API auth tự lo phần xác
-    // thực riêng, không cần middleware can thiệp.
+    // thực riêng, không cần proxy can thiệp.
     "/((?!_next/static|_next/image|favicon.ico|api/).*)",
   ],
 };

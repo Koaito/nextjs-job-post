@@ -28,8 +28,8 @@ export function safeInternalPath(path: string | null | undefined): string | null
 async function currentPath(): Promise<string> {
   const h = await headers();
   // Next.js không có API chính thức lấy pathname trong Server Component
-  // ngoài middleware -> dựa vào header x-invoke-path nếu middleware có
-  // set (xem middleware.ts), hoặc x-pathname nếu dự án tự set qua rewrite.
+  // ngoài proxy -> dựa vào header x-invoke-path do proxy.ts set (xem
+  // proxy.ts), hoặc x-pathname nếu dự án tự set qua rewrite.
   // Nếu không có gì, trả rỗng — requireUser() khi đó sẽ redirect /login
   // không kèm ?next=, vẫn an toàn chỉ là không quay lại đúng trang.
   return h.get("x-invoke-path") ?? h.get("x-pathname") ?? "";

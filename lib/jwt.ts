@@ -1,12 +1,11 @@
 // lib/jwt.ts
 // Hàm decode JWT dùng chung giữa lib/session.ts (Node runtime, Server
-// Component/Route Handler) và middleware.ts (Edge runtime) — tách riêng
-// ra đây vì middleware.ts KHÔNG import được lib/session.ts (file đó
+// Component/Route Handler) và proxy.ts — tách riêng ra đây vì proxy.ts
+// KHÔNG import được lib/session.ts (file đó
 // import next/headers, chỉ dùng được trong ngữ cảnh render Server
-// Component/Route Handler, không phải middleware). File này KHÔNG đụng
-// next/headers hay bất kỳ API riêng Node nào (dùng atob() thay vì
-// Buffer — Buffer không có sẵn trong Edge runtime) để chạy được ở cả 2
-// nơi. (Round sửa refresh — quyết định ở chat238.txt/chat239.txt)
+// Component/Route Handler, không phải proxy). File này KHÔNG đụng
+// next/headers hay API riêng Node nào (dùng atob() thay vì Buffer, giữ
+// nguyên từ thời proxy còn là Edge runtime) để dùng được ở cả 2 nơi. (Round sửa refresh — quyết định ở chat238.txt/chat239.txt)
 //
 // CHỈ đọc phần payload (KHÔNG verify chữ ký — verify thật do backend làm
 // khi request thật sự được gửi lên); ở đây chỉ dùng để quyết định có cần

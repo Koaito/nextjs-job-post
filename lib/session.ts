@@ -7,11 +7,11 @@
 //
 // LƯU Ý (Round sửa refresh): tên cookie/maxAge/options nằm ở
 // lib/auth-cookies.ts, hàm decode JWT nằm ở lib/jwt.ts — cả 2 tách riêng
-// khỏi file này để middleware.ts (chạy Edge runtime, không import được
-// file này vì nó đụng next/headers) vẫn dùng chung được, không phải viết
+// khỏi file này để proxy.ts (không import được file này vì nó đụng
+// next/headers) vẫn dùng chung được, không phải viết
 // lại 1 bản lệch. Từ giờ file refresh CHỦ ĐỘNG duy nhất khi vào tới
-// Server Component gần như luôn thấy access token đã được middleware.ts
-// refresh sẵn — nhánh refresh dưới đây trở thành lớp dự phòng (middleware
+// Server Component gần như luôn thấy access token đã được proxy.ts
+// refresh sẵn — nhánh refresh dưới đây trở thành lớp dự phòng (proxy
 // bị skip do matcher, hoặc token hết hạn ngay giữa lúc render).
 
 import { cache } from "react";

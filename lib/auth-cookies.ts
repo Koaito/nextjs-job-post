@@ -1,11 +1,11 @@
 // lib/auth-cookies.ts
 // Hằng số tên cookie/maxAge/options dùng chung giữa lib/session.ts (Node
-// runtime, dùng cookies() của next/headers) và middleware.ts (Edge
-// runtime, dùng NextRequest/NextResponse.cookies) — tách riêng ra đây
+// runtime, dùng cookies() của next/headers) và proxy.ts (dùng
+// NextRequest/NextResponse.cookies) — tách riêng ra đây
 // (KHÔNG đặt trong lib/session.ts) vì lib/session.ts import "next/headers"
-// ở đầu module nên middleware.ts không import được nó (next/headers chỉ
+// ở đầu module nên proxy.ts không import được nó (next/headers chỉ
 // dùng được trong ngữ cảnh render Server Component/Route Handler, không
-// phải middleware). Tách ra file thuần hằng số này để không phải gõ lặp
+// phải proxy). Tách ra file thuần hằng số này để không phải gõ lặp
 // lại tên cookie/thời hạn ở 2 nơi rồi lệch nhau dần. (Round sửa refresh —
 // chat238.txt/chat239.txt)
 

@@ -10,7 +10,7 @@
 // khai IP giả được.
 //
 // File này THUẦN (không import next/headers) để dùng được cả trong
-// middleware (Edge) lẫn Route Handler. Bản đọc headers() của request
+// proxy.ts lẫn Route Handler. Bản đọc headers() của request
 // hiện tại nằm ở lib/client-ip-server.ts.
 //
 // LƯU Ý TRIỂN KHAI: trên Vercel, x-real-ip / x-forwarded-for do Vercel

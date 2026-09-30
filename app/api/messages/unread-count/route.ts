@@ -5,7 +5,7 @@
 // mutation dựa vào cookie).
 //
 // 3 yêu cầu riêng của route polling (plan Nhóm 4):
-//   1. Hết phiên phải trả 401 JSON THẬT — không redirect. middleware.ts
+//   1. Hết phiên phải trả 401 JSON THẬT — không redirect. proxy.ts
 //      đã loại /api/* khỏi matcher nên không có redirect nào chen vào;
 //      ở đây chỉ cần tự trả đúng mã 401 để fetch phía client tự dừng
 //      polling hẳn.
