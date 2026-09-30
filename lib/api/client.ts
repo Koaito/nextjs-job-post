@@ -54,8 +54,21 @@ async function rawFetch<T>(
   });
 
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    const detail = body?.detail;
+    // Đọc body dạng text rồi tự JSON.parse (thay vì res.json().catch) để
+    // còn nội dung thô mà log khi rơi vào Dạng 3 — body chỉ đọc được 1 lần.
+    const raw = await res.text();
+    let body: { detail?: unknown } = {};
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      // Body không phải JSON (HTML của proxy/Render, chữ thuần "Internal
+      // Server Error"...) -> body rỗng, rơi xuống Dạng 3 bên dưới.
+    }
+    const detail = body?.detail as
+      | { message?: string; error_code?: string; params?: Record<string, string | number> }
+      | Array<{ msg?: string }>
+      | string
+      | undefined;
 
     // Dạng 1: detail là object có error_code -> lỗi nghiệp vụ chuẩn hoá
     if (detail && typeof detail === "object" && !Array.isArray(detail)) {
@@ -75,7 +88,13 @@ async function rawFetch<T>(
       );
     }
 
-    // Dạng 3: không khớp (429 rate-limit, lỗi hạ tầng...) -> fallback
+    // Dạng 3: không khớp (429 rate-limit, 404 detail dạng chuỗi, 5xx, HTML
+    // hạ tầng...) -> ghi log phía server để biết status + body thật, rồi
+    // fallback message chung. Chỉ cắt 300 ký tự; body lỗi không chứa token
+    // (request mới mang token, response thì không).
+    console.error(
+      `[api] ${res.status} ${init.method ?? "GET"} ${path} -> ${raw.slice(0, 300)}`,
+    );
     throw new ApiError("Lỗi không xác định", res.status);
   }
 
