@@ -7,7 +7,14 @@
 //   [x] Phần 2/5 — thanh lọc (đối tượng, công ty, người thực hiện)
 //   [x] Phần 3/5 — phân trang ?page= 50 log/trang, trạng thái rỗng, loading.tsx
 //   [x] Phần 4/5 — sửa note (server action + Dialog)
-//   [ ] Phần 5/5 — hiện `changes` (cũ -> mới) ở log UPDATE_*
+//   [x] Phần 5/5 — hiện `changes` (cũ -> mới): nút "Xem thay đổi" ở log có changes
+//
+// Quyết định có chủ ý: KHÔNG làm badge "còn N log thiếu note" (plan Nhóm 3 có
+// nhắc `pending_note`). Backend chặn cứng note ở action note_required nên
+// badge luôn bằng 0; Flask cũng không có. Chỉ cần làm nếu DB còn log cũ
+// ghi trước khi có chặn cứng — kiểm tra bằng:
+//   SELECT count(*) FROM audit_logs WHERE note_required AND note IS NULL;
+// (lib/api/audit-logs.ts vẫn giữ tham số pending_note để thêm lại là 1 dòng).
 //
 // CHỈ STAFF (@staff_required): requireStaff(). Nhật ký chi tiết TỪNG thao
 // tác theo thời gian — khác /staff-activity (tổng hợp theo người tạo).
@@ -133,6 +140,8 @@ export default async function ActivityLogsPage({ searchParams }: { searchParams:
     errors.push(errorMessage(staffRes.reason, "Đã có lỗi khi tải danh sách người thực hiện."));
   }
   const staff = staffUsers.map((u) => ({ id: u.ss_user_id, name: u.full_name }));
+  // Cho phần 5/5: đổi ss_user_id trong `changes` (người phụ trách) sang tên.
+  const staffNames = Object.fromEntries(staff.map((s) => [s.id, s.name]));
 
   // getCompany() tự nuốt lỗi -> null; tên rỗng thì ô lọc hiện "Công ty đã chọn".
   const companyName = companyRes.status === "fulfilled" ? (companyRes.value?.company_name ?? "") : "";
@@ -171,7 +180,7 @@ export default async function ActivityLogsPage({ searchParams }: { searchParams:
 
       {logs.length > 0 && (
         <>
-          <ActivityLogsTable logs={logs} currentUserId={user.ss_user_id} />
+          <ActivityLogsTable logs={logs} currentUserId={user.ss_user_id} staffNames={staffNames} />
           <Pagination
             basePath="/activity-logs"
             currentParams={buildActivityLogsParams(view, filters)}

@@ -23,6 +23,10 @@
 //  - Không tô nổi dòng "note_required mà thiếu note" (highlight-required):
 //    backend chặn cứng từ lúc ghi nên log bắt buộc luôn có note.
 //  - Giờ qua formatDateTimeVN (giờ VN, không phụ thuộc múi giờ máy chạy).
+// Phần 5/5: log có `changes` có nút "Xem thay đổi" mở dòng con "tên trường:
+// cũ -> mới" (ExpandableLogRow + ActivityLogChanges). Hiện theo "có changes"
+// chứ không theo action_type: backend ghi changes cả ở ASSIGN_CONTACT và
+// DELETE_JOB (đóng JD kèm sửa field), không riêng UPDATE_*.
 // Note do người dùng nhập: chỉ render text thuần (JSX tự escape), tuyệt
 // đối không dangerouslySetInnerHTML (plan Nhóm 4).
 
@@ -36,7 +40,10 @@ import {
 import { formatDateTimeVN } from "@/lib/date";
 import { cn } from "@/lib/utils";
 import type { AuditLogOut } from "@/lib/api/audit-logs";
+import { parseChanges } from "@/lib/audit-changes";
+import { ActivityLogChanges } from "./activity-log-changes";
 import { EditNoteButton } from "./edit-note-button";
+import { ExpandableLogRow } from "./expandable-log-row";
 
 function actorName(log: AuditLogOut): { text: string; muted: boolean } {
   if (!log.actor_id) return { text: "Hệ thống (tự động)", muted: true };
@@ -55,7 +62,11 @@ function EntityCell({ log }: { log: AuditLogOut }) {
   const typeLabel = AUDIT_ENTITY_LABELS[log.entity_type] ?? log.entity_type;
   // Chỉ JOB/COMPANY có trang chi tiết để link (Flask: CONTACT/APPLICATION
   // chỉ hiện chữ).
-  const href = log.entity_id
+  // BULK_IMPORT_*: entity_id là id phiên preview import (không phải id JD/
+  // công ty/contact) nên link sẽ trỏ tới trang không tồn tại -> chỉ hiện chữ.
+  // EMAIL_TEMPLATE: không có trang chi tiết riêng (xoá là xoá cứng) -> chỉ chữ.
+  const linkable = log.entity_id && !log.action_type.startsWith("BULK_IMPORT_");
+  const href = linkable
     ? log.entity_type === "JOB"
       ? `/jobs/${log.entity_id}`
       : log.entity_type === "COMPANY"
@@ -91,7 +102,18 @@ function CompanyCell({ log }: { log: AuditLogOut }) {
   );
 }
 
-export function ActivityLogsTable({ logs, currentUserId }: { logs: AuditLogOut[]; currentUserId: string }) {
+const COLUMN_COUNT = 7;
+
+export function ActivityLogsTable({
+  logs,
+  currentUserId,
+  staffNames,
+}: {
+  logs: AuditLogOut[];
+  currentUserId: string;
+  /** ss_user_id -> họ tên, để hiện tên thay vì UUID ở "Người phụ trách". */
+  staffNames: Record<string, string>;
+}) {
   return (
     <div className="overflow-x-auto rounded-md border">
       <table className="w-full text-sm">
@@ -106,7 +128,7 @@ export function ActivityLogsTable({ logs, currentUserId }: { logs: AuditLogOut[]
                 động như WITHDRAW_JOB_APPLICATION vẫn có note của chính
                 học viên, ẩn cột này ở tab "Tự động" sẽ làm mất note đó. */}
             <th className="min-w-[250px] px-3 py-2 font-medium">Ghi chú</th>
-            <th className="w-[100px] px-3 py-2 font-medium">
+            <th className="w-[130px] px-3 py-2 font-medium">
               <span className="sr-only">Thao tác</span>
             </th>
           </tr>
@@ -115,42 +137,52 @@ export function ActivityLogsTable({ logs, currentUserId }: { logs: AuditLogOut[]
           {logs.map((log) => {
             const actor = actorName(log);
             const tone = auditActionTone(log.action_type);
+            const changeRows = parseChanges(log.entity_type, log.changes, { staffNames });
             return (
-              <tr key={log.log_id} className="border-b align-top last:border-0">
-                <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
-                  {formatDateTimeVN(log.created_at)}
-                </td>
-                <td className={cn("px-3 py-2", actor.muted && "text-muted-foreground")}>{actor.text}</td>
-                <td className="px-3 py-2">
-                  <span
-                    className={cn(
-                      "inline-block rounded-full px-[9px] py-1 text-[11px] font-semibold whitespace-nowrap",
-                      AUDIT_ACTION_TONE_CLASSES[tone],
-                    )}
-                  >
-                    {AUDIT_ACTION_LABELS[log.action_type] ?? log.action_type}
-                  </span>
-                </td>
-                <td className="px-3 py-2">
-                  <EntityCell log={log} />
-                </td>
-                <td className="px-3 py-2">
-                  <CompanyCell log={log} />
-                </td>
-                <td className="px-3 py-2">
-                  {log.note ? (
-                    <>
-                      <div className="whitespace-pre-wrap">{log.note}</div>
-                      {log.note_updated_at && (
-                        <small className="text-muted-foreground">(Sửa: {formatDateTimeVN(log.note_updated_at)})</small>
+              <ExpandableLogRow
+                key={log.log_id}
+                logId={log.log_id}
+                colSpan={COLUMN_COUNT}
+                cells={
+                  <>
+                    <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
+                      {formatDateTimeVN(log.created_at)}
+                    </td>
+                    <td className={cn("px-3 py-2", actor.muted && "text-muted-foreground")}>{actor.text}</td>
+                    <td className="px-3 py-2">
+                      <span
+                        className={cn(
+                          "inline-block rounded-full px-[9px] py-1 text-[11px] font-semibold whitespace-nowrap",
+                          AUDIT_ACTION_TONE_CLASSES[tone],
+                        )}
+                      >
+                        {AUDIT_ACTION_LABELS[log.action_type] ?? log.action_type}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2">
+                      <EntityCell log={log} />
+                    </td>
+                    <td className="px-3 py-2">
+                      <CompanyCell log={log} />
+                    </td>
+                    <td className="px-3 py-2">
+                      {log.note ? (
+                        <>
+                          <div className="whitespace-pre-wrap">{log.note}</div>
+                          {log.note_updated_at && (
+                            <small className="text-muted-foreground">
+                              (Sửa: {formatDateTimeVN(log.note_updated_at)})
+                            </small>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
                       )}
-                    </>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </td>
-                <td className="px-3 py-2">
-                  {log.actor_id && log.actor_id === currentUserId && (
+                    </td>
+                  </>
+                }
+                actions={
+                  log.actor_id && log.actor_id === currentUserId ? (
                     <EditNoteButton
                       // Đổi key khi note đổi -> dialog dựng lại với note mới.
                       key={`${log.note_updated_at ?? ""}|${log.note ?? ""}`}
@@ -158,9 +190,10 @@ export function ActivityLogsTable({ logs, currentUserId }: { logs: AuditLogOut[]
                       currentNote={log.note ?? ""}
                       logSummary={`${AUDIT_ACTION_LABELS[log.action_type] ?? log.action_type} — ${log.entity_label || log.entity_id}`}
                     />
-                  )}
-                </td>
-              </tr>
+                  ) : null
+                }
+                detail={changeRows.length > 0 ? <ActivityLogChanges rows={changeRows} /> : null}
+              />
             );
           })}
         </tbody>

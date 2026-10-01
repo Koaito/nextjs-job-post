@@ -208,6 +208,15 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   ASSIGN_CONTACT: "Gán người phụ trách",
   APPLY_JOB: "Ứng viên nộp CV",
   WITHDRAW_JOB_APPLICATION: "Ứng viên huỷ ứng tuyển",
+  // Thêm sau bản Flask (backend: db/audit_logs.py ACTION_LOG_RULES). BULK_IMPORT_*
+  // ghi entity_type JOB/COMPANY/CONTACT nhưng entity_id là id phiên import,
+  // xem EntityCell ở activity-logs-table.tsx.
+  BULK_IMPORT_JOB: "Nhập hàng loạt JD",
+  BULK_IMPORT_COMPANY: "Nhập hàng loạt công ty",
+  BULK_IMPORT_CONTACT: "Nhập hàng loạt người liên hệ",
+  CREATE_EMAIL_TEMPLATE: "Thêm mẫu email",
+  UPDATE_EMAIL_TEMPLATE: "Sửa mẫu email",
+  DELETE_EMAIL_TEMPLATE: "Xoá mẫu email",
 };
 
 /** Key đối tượng (gửi API `entity_type`) -> nhãn hiển thị. Thứ tự = thứ tự
@@ -217,6 +226,7 @@ export const AUDIT_ENTITY_LABELS: Record<string, string> = {
   COMPANY: "Công ty",
   CONTACT: "Người liên hệ",
   APPLICATION: "Đơn ứng tuyển",
+  EMAIL_TEMPLATE: "Mẫu email",
 };
 
 export type AuditActionTone = "success" | "warning" | "danger" | "neutral";
