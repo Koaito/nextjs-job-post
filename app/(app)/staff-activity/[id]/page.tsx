@@ -22,7 +22,6 @@ import { requireStaff } from "@/lib/auth-guard";
 import { listStaffUsers, type StaffUser } from "@/lib/api/auth";
 import { StaffActivityView } from "@/components/staff-activity-view";
 import { ROLE_LABELS } from "@/lib/constants";
-import { formatDateVN } from "@/lib/date";
 
 export const dynamic = "force-dynamic";
 
@@ -76,12 +75,16 @@ export default async function StaffActivityDetailPage({
         <span className="text-sm text-muted-foreground">Career Hub / Quản trị / Hoạt động team SS</span>
         <h1 className="font-heading text-3xl font-semibold">{member.full_name}</h1>
         <p className="mt-1 text-muted-foreground">
-          {member.email} · {ROLE_LABELS[member.role] ?? member.role} · Tạo tài khoản{" "}
-          {formatDateVN(member.created_at)}
+          {member.email} · {ROLE_LABELS[member.role] ?? member.role}
         </p>
       </header>
 
-      <StaffActivityView ssUserId={member.ss_user_id} subject="other" staff={staff} />
+      <StaffActivityView
+        ssUserId={member.ss_user_id}
+        subject="other"
+        staff={staff}
+        accountCreatedAt={member.created_at}
+      />
     </div>
   );
 }

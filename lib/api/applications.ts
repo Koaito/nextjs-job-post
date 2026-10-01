@@ -11,6 +11,7 @@ import type { components } from "./types";
 export type JobApplicantOut = components["schemas"]["JobApplicantOut"];
 export type JobSaverOut = components["schemas"]["JobSaverOut"];
 export type SavedJobOut = components["schemas"]["SavedJobOut"];
+export type JobApplicationOut = components["schemas"]["JobApplicationOut"];
 export type SavedJobToggleResult = components["schemas"]["SavedJobToggleResult"];
 
 /**
@@ -53,6 +54,29 @@ export async function getApplicantCvUrl(applicationId: string): Promise<string> 
     `/jobs/applications/${encodeURIComponent(applicationId)}/cv-url`,
   );
   return res.signed_url;
+}
+
+/**
+ * GET /auth/users/{ss_user_id}/applications — staff xem 1 học viên BẤT KỲ
+ * đã ứng tuyển job nào (trang /student-activity/[id], Nhóm 3 Đợt 3.3).
+ * KHÁC listMyApplications() ở me.ts (học viên xem đơn của CHÍNH MÌNH) dù
+ * cùng response_model JobApplicationOut. require_role("ss_team") ở
+ * backend — nơi gọi tự đảm bảo đã requireStaff(), không check lại ở đây
+ * (cùng quy ước listJobApplicants() ở trên).
+ */
+export async function listApplicationsOfUser(ssUserId: string): Promise<JobApplicationOut[]> {
+  return (
+    (await callAuthed<JobApplicationOut[]>(`/auth/users/${encodeURIComponent(ssUserId)}/applications`)) ?? []
+  );
+}
+
+/**
+ * GET /auth/users/{ss_user_id}/saved-jobs — mirror listApplicationsOfUser()
+ * nhưng cho chiều "đã lưu" (bookmark). Thêm 08/2026 phía backend; trước
+ * đó saved_jobs riêng tư hoàn toàn, staff không xem được theo học viên.
+ */
+export async function listSavedJobsOfUser(ssUserId: string): Promise<SavedJobOut[]> {
+  return (await callAuthed<SavedJobOut[]>(`/auth/users/${encodeURIComponent(ssUserId)}/saved-jobs`)) ?? [];
 }
 
 /**

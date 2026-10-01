@@ -21,6 +21,10 @@
 // JobCard ở /jobs vốn luôn hiện chip ngành "Chưa xác định"); chip trạng
 // thái nằm cạnh tiêu đề (ticket-top), không nằm trong stub.
 //
+// `accountCreatedAt` (tuỳ chọn): khớp staff_activity_detail.html — dòng
+// "Ngày tạo tài khoản" nằm cùng card với 4 số thống kê (dl thứ 2). Không
+// truyền (vd /profile/activity) thì không hiện dòng này.
+//
 // `staff` (tuỳ chọn): trang gọi đã có sẵn danh sách staff thì truyền vào
 // để khỏi gọi GET /auth/users lần nữa (vd /staff-activity/[id] đã tải
 // toàn bộ user để tìm người được xem).
@@ -76,10 +80,12 @@ export async function StaffActivityView({
   ssUserId,
   subject,
   staff: staffPreloaded,
+  accountCreatedAt,
 }: {
   ssUserId: string;
   subject: StaffActivitySubject;
   staff?: StaffUser[];
+  accountCreatedAt?: string | null;
 }) {
   const [jobsRes, companiesRes, contactsCreatedRes, contactsAssignedRes, staffRes] =
     await Promise.allSettled([
@@ -121,24 +127,34 @@ export async function StaffActivityView({
         </p>
       ))}
 
-      <dl className="grid grid-cols-2 gap-4 rounded-md border p-4 sm:grid-cols-4">
-        <div>
-          <dt className="text-sm text-muted-foreground">Job đã tạo</dt>
-          <dd className="text-2xl font-semibold">{jobsCreated.length}</dd>
-        </div>
-        <div>
-          <dt className="text-sm text-muted-foreground">Công ty đã tạo</dt>
-          <dd className="text-2xl font-semibold">{companiesCreated.length}</dd>
-        </div>
-        <div>
-          <dt className="text-sm text-muted-foreground">Contact đã tạo</dt>
-          <dd className="text-2xl font-semibold">{contactsCreated.length}</dd>
-        </div>
-        <div>
-          <dt className="text-sm text-muted-foreground">Contact đang phụ trách</dt>
-          <dd className="text-2xl font-semibold">{contactsAssigned.length}</dd>
-        </div>
-      </dl>
+      <div className="space-y-3 rounded-md border p-4">
+        <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div>
+            <dt className="text-sm text-muted-foreground">Job đã tạo</dt>
+            <dd className="text-2xl font-semibold">{jobsCreated.length}</dd>
+          </div>
+          <div>
+            <dt className="text-sm text-muted-foreground">Công ty đã tạo</dt>
+            <dd className="text-2xl font-semibold">{companiesCreated.length}</dd>
+          </div>
+          <div>
+            <dt className="text-sm text-muted-foreground">Contact đã tạo</dt>
+            <dd className="text-2xl font-semibold">{contactsCreated.length}</dd>
+          </div>
+          <div>
+            <dt className="text-sm text-muted-foreground">Contact đang phụ trách</dt>
+            <dd className="text-2xl font-semibold">{contactsAssigned.length}</dd>
+          </div>
+        </dl>
+        {accountCreatedAt !== undefined && (
+          <dl className="border-t pt-3">
+            <div className="flex flex-wrap gap-2 text-sm">
+              <dt className="text-muted-foreground">Ngày tạo tài khoản</dt>
+              <dd className="font-medium">{formatDate(accountCreatedAt)}</dd>
+            </div>
+          </dl>
+        )}
+      </div>
 
       {/* --- Job đã tạo --- */}
       <section className="space-y-3">
