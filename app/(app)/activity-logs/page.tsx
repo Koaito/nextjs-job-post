@@ -5,7 +5,7 @@
 //   [x] Phần 1/5 — lib/api/audit-logs.ts, bảng nhãn/màu (lib/constants.ts),
 //                  trang này với 2 tab + bảng 7 cột
 //   [x] Phần 2/5 — thanh lọc (đối tượng, công ty, người thực hiện)
-//   [ ] Phần 3/5 — phân trang ?page= 50 log/trang, trạng thái rỗng, loading.tsx
+//   [x] Phần 3/5 — phân trang ?page= 50 log/trang, trạng thái rỗng, loading.tsx
 //   [ ] Phần 4/5 — sửa note (server action + Dialog)
 //   [ ] Phần 5/5 — hiện `changes` (cũ -> mới) ở log UPDATE_*
 //
@@ -26,9 +26,13 @@
 // hiển thị trên ô lọc. Khác Flask: không tải danh sách toàn bộ công ty cho
 // dropdown (ô tìm công ty tự gọi /api/companies/search khi staff gõ).
 //
-// Phần 1-2 CHƯA phân trang: chỉ tải 50 log mới nhất của view + bộ lọc đang
-// chọn; nếu tổng lớn hơn thì có dòng báo. Phần 3/5 thay bằng phân trang thật.
+// Phân trang (phần 3/5): `?page=` (50 log/trang, offset ở backend — log tăng
+// không giới hạn nên không tải hết). `page` lạ/thiếu -> 1. Nếu `page` vượt
+// tổng số trang (log bị bớt, link cũ) thì redirect về trang cuối đúng như
+// Flask kẹp `min(page, total_pages)`, để URL luôn khớp nội dung. Dùng lại
+// <Pagination> của /jobs (Trước/Sau là <Link> thật + ô "Tới trang" là form GET).
 
+import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth-guard";
 import { listAuditLogs, type AuditLogOut, type AuditLogView } from "@/lib/api/audit-logs";
 import { listStaffUsers, type StaffUser } from "@/lib/api/auth";
@@ -37,7 +41,13 @@ import { AUDIT_ENTITY_LABELS } from "@/lib/constants";
 import { ActivityLogsTabNav } from "./activity-logs-tab-nav";
 import { ActivityLogsFilterBar } from "./activity-logs-filter-bar";
 import { ActivityLogsTable } from "./activity-logs-table";
-import { hasActiveFilter, type ActivityLogFilterValues } from "./activity-logs-url";
+import { Pagination } from "../jobs/pagination";
+import {
+  buildActivityLogsHref,
+  buildActivityLogsParams,
+  hasActiveFilter,
+  type ActivityLogFilterValues,
+} from "./activity-logs-url";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +66,12 @@ function first(raw: string | string[] | undefined): string {
 
 function parseView(raw: string | string[] | undefined): AuditLogView {
   return first(raw) === "manual" ? "manual" : "auto";
+}
+
+/** Số nguyên dương hợp lệ, còn lại -> 1. Chặn số quá lớn làm offset tràn. */
+function parsePage(raw: string | string[] | undefined): number {
+  const n = Number(first(raw));
+  return Number.isInteger(n) && n >= 1 && n <= 100_000 ? n : 1;
 }
 
 function parseFilters(sp: SearchParams): ActivityLogFilterValues {
@@ -78,6 +94,7 @@ export default async function ActivityLogsPage({ searchParams }: { searchParams:
   const sp = await searchParams;
   const view = parseView(sp.view);
   const filters = parseFilters(sp);
+  const page = parsePage(sp.page);
 
   const [logsRes, staffRes, companyRes] = await Promise.allSettled([
     listAuditLogs({
@@ -86,11 +103,17 @@ export default async function ActivityLogsPage({ searchParams }: { searchParams:
       company_id: filters.companyId,
       actor_id: filters.actorId,
       limit: PAGE_SIZE,
-      offset: 0,
+      offset: (page - 1) * PAGE_SIZE,
     }),
     listStaffUsers(),
     filters.companyId ? getCompany(filters.companyId) : Promise.resolve(null),
   ]);
+
+  // Vượt tổng số trang -> về trang cuối (redirect phải ở NGOÀI try/catch).
+  if (logsRes.status === "fulfilled") {
+    const lastPage = Math.max(1, Math.ceil(logsRes.value.total / PAGE_SIZE));
+    if (page > lastPage) redirect(buildActivityLogsHref(view, filters, lastPage));
+  }
 
   const errors: string[] = [];
 
@@ -116,6 +139,7 @@ export default async function ActivityLogsPage({ searchParams }: { searchParams:
 
   const filtered = hasActiveFilter(filters);
   const logsOk = logsRes.status === "fulfilled";
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
     <div className="space-y-6">
@@ -147,10 +171,13 @@ export default async function ActivityLogsPage({ searchParams }: { searchParams:
 
       {logs.length > 0 && (
         <>
-          {total > logs.length && (
-            <p className="text-sm text-muted-foreground">Đang hiện {logs.length} log mới nhất trong tổng số {total} log.</p>
-          )}
           <ActivityLogsTable logs={logs} />
+          <Pagination
+            basePath="/activity-logs"
+            currentParams={buildActivityLogsParams(view, filters)}
+            page={page}
+            totalPages={totalPages}
+          />
         </>
       )}
     </div>

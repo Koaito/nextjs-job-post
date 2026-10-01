@@ -16,11 +16,20 @@ export function hasActiveFilter(f: ActivityLogFilterValues): boolean {
   return Boolean(f.entityType || f.companyId || f.actorId);
 }
 
-export function buildActivityLogsHref(view: AuditLogView, f: ActivityLogFilterValues): string {
+/** Query hiện tại (view + bộ lọc), KHÔNG có `page` — dùng cho tab-nav và
+ *  <Pagination currentParams>. */
+export function buildActivityLogsParams(view: AuditLogView, f: ActivityLogFilterValues): URLSearchParams {
   const params = new URLSearchParams();
   params.set("view", view);
   if (f.entityType) params.set("entity_type", f.entityType);
   if (f.companyId) params.set("company_id", f.companyId);
   if (f.actorId) params.set("actor_id", f.actorId);
+  return params;
+}
+
+/** `page` chỉ được ghi khi > 1 (trang 1 = URL gọn, không có ?page=). */
+export function buildActivityLogsHref(view: AuditLogView, f: ActivityLogFilterValues, page = 1): string {
+  const params = buildActivityLogsParams(view, f);
+  if (page > 1) params.set("page", String(page));
   return `/activity-logs?${params.toString()}`;
 }

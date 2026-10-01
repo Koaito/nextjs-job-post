@@ -5,8 +5,11 @@
 // kê TOÀN BỘ công ty của Flask — với 1.200+ (plan: 5.000-7.000) công ty thì
 // <select> thường không dùng nổi.
 //
-// Lọc ở SERVER (cmdk shouldFilter={false}): mỗi lần gõ, debounce 300ms rồi
-// gọi GET /api/companies/search?q=, tối đa 50 kết quả. Request cũ bị huỷ
+// Lọc ở SERVER (cmdk shouldFilter={false}): gõ từ MIN_QUERY_LENGTH ký tự
+// trở lên, debounce 300ms rồi gọi GET /api/companies/search?q=, tối đa 50
+// kết quả. Mở ô mà chưa gõ thì KHÔNG gọi API (backend sắp theo created_at
+// DESC nên 50 công ty "đầu" chỉ là 50 công ty mới nhất, không phải gợi ý
+// có ích; còn tốn 1 request + hạn mức 60/phút của GET /companies). Request cũ bị huỷ
 // bằng AbortController khi có lần gõ mới (plan Nhóm 3: không để response cũ
 // về sau ghi đè kết quả mới). Chạm trần 50 thì có dòng nhắc gõ thêm.
 //
@@ -17,6 +20,7 @@ import { useEffect, useRef, useState } from "react";
 import { Command, CommandEmpty, CommandItem, CommandList, CommandInput } from "@/components/ui/command";
 
 const DEBOUNCE_MS = 300;
+const MIN_QUERY_LENGTH = 2;
 
 interface CompanyHit {
   id: string;
@@ -50,10 +54,12 @@ export function CompanyFilterCombobox({
     return () => document.removeEventListener("mousedown", onMouseDown);
   }, []);
 
-  // Tải kết quả khi mở ô / khi gõ. Lần mở đầu (query rỗng) gọi ngay, các
-  // lần gõ sau debounce.
+  // Chỉ tìm khi đã gõ đủ ký tự; chưa đủ thì ẩn kết quả cũ (không gọi API).
+  const searchable = query.trim().length >= MIN_QUERY_LENGTH;
+
+  // Tải kết quả khi gõ (debounce).
   useEffect(() => {
-    if (!open) return;
+    if (!open || !searchable) return;
     const controller = new AbortController();
     const timer = setTimeout(
       async () => {
@@ -77,13 +83,13 @@ export function CompanyFilterCombobox({
           if (!controller.signal.aborted) setLoading(false);
         }
       },
-      query.trim() ? DEBOUNCE_MS : 0,
+      DEBOUNCE_MS,
     );
     return () => {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [open, query]);
+  }, [open, query, searchable]);
 
   function choose(hit: CompanyHit) {
     setSelected(hit);
@@ -124,7 +130,12 @@ export function CompanyFilterCombobox({
               <CommandItem value="__all__" onSelect={() => choose({ id: "", name: "" })}>
                 Mọi công ty
               </CommandItem>
-              {items.map((c) => (
+              {!searchable && (
+                <p className="px-3 py-2 text-xs text-muted-foreground">
+                  Gõ ít nhất {MIN_QUERY_LENGTH} ký tự để tìm công ty.
+                </p>
+              )}
+              {searchable && items.map((c) => (
                 <CommandItem
                   key={c.id}
                   value={c.id}
@@ -135,10 +146,10 @@ export function CompanyFilterCombobox({
                   {c.active === false && <span className="ml-1 text-xs text-muted-foreground">(đã xoá)</span>}
                 </CommandItem>
               ))}
-              {!loading && !error && items.length === 0 && <CommandEmpty>Không tìm thấy công ty nào.</CommandEmpty>}
-              {loading && <p className="px-3 py-2 text-xs text-muted-foreground">Đang tìm…</p>}
-              {error && <p className="px-3 py-2 text-xs text-destructive">{error}</p>}
-              {!loading && !error && total > items.length && (
+              {searchable && !loading && !error && items.length === 0 && <CommandEmpty>Không tìm thấy công ty nào.</CommandEmpty>}
+              {searchable && loading && <p className="px-3 py-2 text-xs text-muted-foreground">Đang tìm…</p>}
+              {searchable && error && <p className="px-3 py-2 text-xs text-destructive">{error}</p>}
+              {searchable && !loading && !error && total > items.length && (
                 <p className="px-3 py-2 text-xs text-muted-foreground">
                   Hiển thị {items.length} kết quả đầu trong {total} — gõ thêm để thu hẹp.
                 </p>
