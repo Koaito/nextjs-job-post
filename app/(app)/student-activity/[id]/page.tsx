@@ -13,7 +13,7 @@
 // Không phân trang (plan Nhóm 3): render toàn bộ 2 danh sách.
 //
 // Nút "Tải CV ứng tuyển" trỏ GET /students/cv/<application_id> (Route
-// Handler, Phần 4/4), mở tab mới target="_blank" rel="noopener". Dùng
+// Handler app/(app)/students/cv/[applicationId]/route.ts), mở tab mới target="_blank" rel="noopener". Dùng
 // <a> thường, KHÔNG dùng <Link>: tránh Next prefetch gọi route redirect
 // này khi card hiện ra trên màn hình.
 // force-dynamic: staff cần thấy ứng tuyển/lưu mới nhất của học viên.

@@ -4,7 +4,7 @@
 //   [x] Phần 1/4 — tách components/staff-activity-view.tsx dùng chung
 //   [x] Phần 2/4 — /staff-activity (danh sách, file này) + /staff-activity/[id]
 //   [x] Phần 3/4 — /student-activity + /student-activity/[id]
-//   [ ] Phần 4/4 — route tải CV cho staff (GET /students/cv/<application_id>)
+//   [x] Phần 4/4 — route tải CV cho staff (GET /students/cv/<application_id>)
 //
 // CHỈ STAFF (@staff_required bên Flask): requireStaff() — ss_team xem
 // được, không cần admin. Danh sách lấy 1 lần toàn bộ (không phân trang)
