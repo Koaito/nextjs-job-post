@@ -33,6 +33,7 @@ export function NoteConfirmDialog({
   noteLabel = "Ghi chú (không bắt buộc)",
   notePlaceholder,
   noteRequired = false,
+  initialNote = "",
   showNote = true,
   confirmLabel = "Xác nhận",
   cancelLabel = "Hủy",
@@ -46,6 +47,9 @@ export function NoteConfirmDialog({
   noteLabel?: string;
   notePlaceholder?: string;
   noteRequired?: boolean;
+  /** Giá trị ban đầu của ô note (vd SỬA note có sẵn). Đóng dialog/lưu xong
+   *  thì ô quay về đúng giá trị này; mặc định "" nên các nơi gọi cũ không đổi. */
+  initialNote?: string;
   /** false = chỉ xác nhận, KHÔNG có ô note (vd đổi role ở /staff-accounts
    *  — backend không nhận note). onConfirm nhận "" và noteRequired bị bỏ qua. */
   showNote?: boolean;
@@ -56,7 +60,7 @@ export function NoteConfirmDialog({
    *  đóng dialog) — khớp hành vi Flask flash lỗi rồi vẫn ở lại form. */
   onConfirm: (note: string) => Promise<{ ok: boolean; message: string }>;
 }) {
-  const [note, setNote] = useState("");
+  const [note, setNote] = useState(initialNote);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -69,7 +73,7 @@ export function NoteConfirmDialog({
   function handleOpenChange(next: boolean) {
     if (!next) {
       if (pending) return; // đang xử lý dở thì không cho đóng ngang
-      setNote("");
+      setNote(initialNote);
       setError(null);
     }
     onOpenChange(next);
@@ -88,7 +92,7 @@ export function NoteConfirmDialog({
       setError(result.message);
       return;
     }
-    setNote("");
+    setNote(initialNote);
     onOpenChange(false);
   }
 

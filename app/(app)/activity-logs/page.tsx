@@ -6,7 +6,7 @@
 //                  trang này với 2 tab + bảng 7 cột
 //   [x] Phần 2/5 — thanh lọc (đối tượng, công ty, người thực hiện)
 //   [x] Phần 3/5 — phân trang ?page= 50 log/trang, trạng thái rỗng, loading.tsx
-//   [ ] Phần 4/5 — sửa note (server action + Dialog)
+//   [x] Phần 4/5 — sửa note (server action + Dialog)
 //   [ ] Phần 5/5 — hiện `changes` (cũ -> mới) ở log UPDATE_*
 //
 // CHỈ STAFF (@staff_required): requireStaff(). Nhật ký chi tiết TỪNG thao
@@ -90,7 +90,7 @@ function errorMessage(reason: unknown, fallback: string): string {
 }
 
 export default async function ActivityLogsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  await requireStaff();
+  const user = await requireStaff();
   const sp = await searchParams;
   const view = parseView(sp.view);
   const filters = parseFilters(sp);
@@ -171,7 +171,7 @@ export default async function ActivityLogsPage({ searchParams }: { searchParams:
 
       {logs.length > 0 && (
         <>
-          <ActivityLogsTable logs={logs} />
+          <ActivityLogsTable logs={logs} currentUserId={user.ss_user_id} />
           <Pagination
             basePath="/activity-logs"
             currentParams={buildActivityLogsParams(view, filters)}

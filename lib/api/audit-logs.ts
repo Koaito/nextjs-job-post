@@ -1,7 +1,6 @@
 // lib/api/audit-logs.ts
 // Tương đương crawler_client/audit_logs.py bên Flask (phần ĐỌC). Nhóm 3,
-// Đợt 3.4, Phần 1/5. Sửa note (PATCH /audit-logs/{id}/note) thuộc phần
-// 4/5, thêm vào file này sau.
+// Đợt 3.4, Phần 1/5. Phần 4/5 thêm updateAuditLogNote (PATCH note).
 //
 // GET /audit-logs yêu cầu require_role("ss_team") qua JWT (không chỉ API
 // key như /jobs, /companies công khai) -> callAuthed(), KHÔNG callPublic().
@@ -55,4 +54,18 @@ export async function listAuditLogs(filters: AuditLogFilters = {}): Promise<Pagi
   if (filters.action_type) params.set("action_type", filters.action_type);
   if (filters.pending_note !== undefined) params.set("pending_note", filters.pending_note ? "true" : "false");
   return callAuthed<PaginatedAuditLogs>(`/audit-logs?${params.toString()}`);
+}
+
+/**
+ * PATCH /audit-logs/{log_id}/note — sửa note của 1 log. Backend chỉ cho
+ * ĐÚNG actor gốc của log (403 kể cả admin khác), 404 nếu log không còn, 409
+ * nếu cố xoá trống note của log bắt buộc, 422 nếu note rỗng/toàn khoảng
+ * trắng (min_length=1 + validate_note_not_blank). Nơi gọi tự requireStaff()
+ * và tự .trim() trước — xem lib/actions/audit-log-actions.ts.
+ */
+export async function updateAuditLogNote(logId: string, note: string): Promise<AuditLogOut> {
+  return callAuthed<AuditLogOut>(`/audit-logs/${encodeURIComponent(logId)}/note`, {
+    method: "PATCH",
+    body: JSON.stringify({ note }),
+  });
 }

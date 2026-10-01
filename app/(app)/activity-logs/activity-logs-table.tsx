@@ -1,8 +1,12 @@
 // app/(app)/activity-logs/activity-logs-table.tsx
 // Bảng 7 cột của /activity-logs — tương đương <table class="activity-table">
 // ở _activity_logs_body.html (Flask). Nhóm 3, Đợt 3.4, Phần 1/5.
-// Server Component thuần. Cột cuối (nút "Sửa note") để trống ở phần này,
-// thêm ở phần 4/5 (server action + Dialog).
+// Server Component thuần. Cột cuối: nút "Sửa note" (phần 4/5, Client
+// Component <EditNoteButton>) CHỈ hiện ở log do chính người đang đăng nhập
+// tạo — backend trả 403 với mọi người khác kể cả admin (plan Nhóm 3), nên
+// ẩn hẳn thay vì hiện ra rồi nhận lỗi. Hiện ở MỌI log của mình, kể cả log
+// note_required (Flask ẩn ở đó): backend vẫn cho chỉnh lại câu chữ, chỉ chặn
+// xoá trống, nên ô note trong dialog bắt buộc nhập.
 //
 // Khác Flask, có chủ đích (đã chốt với người dùng):
 //  - Màu badge theo action_type (lib/constants.ts::auditActionTone).
@@ -32,6 +36,7 @@ import {
 import { formatDateTimeVN } from "@/lib/date";
 import { cn } from "@/lib/utils";
 import type { AuditLogOut } from "@/lib/api/audit-logs";
+import { EditNoteButton } from "./edit-note-button";
 
 function actorName(log: AuditLogOut): { text: string; muted: boolean } {
   if (!log.actor_id) return { text: "Hệ thống (tự động)", muted: true };
@@ -86,7 +91,7 @@ function CompanyCell({ log }: { log: AuditLogOut }) {
   );
 }
 
-export function ActivityLogsTable({ logs }: { logs: AuditLogOut[] }) {
+export function ActivityLogsTable({ logs, currentUserId }: { logs: AuditLogOut[]; currentUserId: string }) {
   return (
     <div className="overflow-x-auto rounded-md border">
       <table className="w-full text-sm">
@@ -144,7 +149,17 @@ export function ActivityLogsTable({ logs }: { logs: AuditLogOut[] }) {
                     <span className="text-muted-foreground">—</span>
                   )}
                 </td>
-                <td className="px-3 py-2">{/* Nút "Sửa note": phần 4/5. */}</td>
+                <td className="px-3 py-2">
+                  {log.actor_id && log.actor_id === currentUserId && (
+                    <EditNoteButton
+                      // Đổi key khi note đổi -> dialog dựng lại với note mới.
+                      key={`${log.note_updated_at ?? ""}|${log.note ?? ""}`}
+                      logId={log.log_id}
+                      currentNote={log.note ?? ""}
+                      logSummary={`${AUDIT_ACTION_LABELS[log.action_type] ?? log.action_type} — ${log.entity_label || log.entity_id}`}
+                    />
+                  )}
+                </td>
               </tr>
             );
           })}
