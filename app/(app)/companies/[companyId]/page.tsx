@@ -28,13 +28,7 @@ import { ContactStatusCell } from "@/components/contact-cells";
 import { DeleteContactButton } from "@/components/delete-contact-button";
 import { EmailTemplatePickerModal } from "@/components/email-template-picker-modal";
 import { HardDeleteContactButton } from "./hard-delete-contact-button";
-
-function formatDate(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("vi-VN");
-}
+import { formatDateVN } from "@/lib/date";
 
 function ContactRow({
   contact,
@@ -309,7 +303,7 @@ export default async function CompanyDetailPage({
               </div>
               <div className="flex justify-between gap-2">
                 <dt className="text-muted-foreground">Ngày tạo</dt>
-                <dd>{formatDate(company.created_at)}</dd>
+                <dd>{formatDateVN(company.created_at)}</dd>
               </div>
             </dl>
           </section>

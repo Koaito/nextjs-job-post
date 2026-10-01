@@ -16,16 +16,9 @@ import { buttonVariants } from "@/components/ui/button";
 import { listMyApplications, type JobApplicationOut } from "@/lib/api/me";
 import { requireStudent } from "@/lib/auth-guard";
 import { JOB_STATUS_LABELS } from "@/lib/constants";
+import { formatDateVN } from "@/lib/date";
 
 export const dynamic = "force-dynamic";
-
-function formatDate(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  // Cố định múi giờ VN: server (Vercel) chạy UTC.
-  return d.toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
-}
 
 export default async function MyApplicationsPage() {
   await requireStudent();
@@ -95,7 +88,7 @@ export default async function MyApplicationsPage() {
                     <p className="m-0 text-sm text-muted-foreground">Ghi chú của bạn: {a.note}</p>
                   )}
                   <div className="mt-auto border-t border-border pt-2 text-xs text-muted-foreground">
-                    <span>📨 Đã ứng tuyển: {formatDate(a.applied_at)}</span>
+                    <span>📨 Đã ứng tuyển: {formatDateVN(a.applied_at)}</span>
                   </div>
                   <WithdrawApplicationButton
                     jobId={a.job_id}

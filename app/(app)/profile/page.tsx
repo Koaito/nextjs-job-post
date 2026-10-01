@@ -13,17 +13,9 @@
 import { requireUser } from "@/lib/auth-guard";
 import { ROLE_LABELS } from "@/lib/constants";
 import { ProfileForm } from "./profile-form";
+import { formatDateVN } from "@/lib/date";
 
 export const dynamic = "force-dynamic";
-
-function formatDate(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  // Cố định múi giờ VN: server (Vercel) chạy UTC, không cố định thì ngày
-  // "Tham gia từ" của giờ tối VN có thể hiện lùi 1 ngày.
-  return d.toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
-}
 
 export default async function ProfilePage() {
   const user = await requireUser();
@@ -45,7 +37,7 @@ export default async function ProfilePage() {
         {user.created_at && (
           <div>
             <dt className="text-xs uppercase tracking-wide text-muted-foreground">Tham gia từ</dt>
-            <dd className="text-sm font-medium">{formatDate(user.created_at)}</dd>
+            <dd className="text-sm font-medium">{formatDateVN(user.created_at)}</dd>
           </div>
         )}
       </dl>

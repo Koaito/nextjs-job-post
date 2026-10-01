@@ -42,6 +42,7 @@ import {
   INDUSTRY_BADGE_STYLES,
   INDUSTRY_BADGE_FALLBACK,
 } from "@/lib/constants";
+import { formatDateVN } from "@/lib/date";
 
 export type StaffActivitySubject = "self" | "other";
 
@@ -62,15 +63,6 @@ const EMPTY: Record<
     contactsAssigned: "Thành viên này chưa được giao phụ trách contact nào.",
   },
 };
-
-const VN_TZ = "Asia/Ho_Chi_Minh";
-
-function formatDate(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("vi-VN", { timeZone: VN_TZ });
-}
 
 function errorMessage(reason: unknown): string {
   return reason instanceof Error ? reason.message : "Đã có lỗi khi tải dữ liệu.";
@@ -150,7 +142,7 @@ export async function StaffActivityView({
           <dl className="border-t pt-3">
             <div className="flex flex-wrap gap-2 text-sm">
               <dt className="text-muted-foreground">Ngày tạo tài khoản</dt>
-              <dd className="font-medium">{formatDate(accountCreatedAt)}</dd>
+              <dd className="font-medium">{formatDateVN(accountCreatedAt)}</dd>
             </div>
           </dl>
         )}
@@ -212,7 +204,7 @@ export async function StaffActivityView({
                       {card.location && ` · ${card.location}`}
                     </p>
                     <div className="mt-auto border-t border-border pt-2 text-xs text-muted-foreground">
-                      <span>📅 Hạn: {formatDate(card.deadline)}</span>
+                      <span>📅 Hạn: {formatDateVN(card.deadline)}</span>
                     </div>
                   </div>
                 </article>

@@ -26,6 +26,7 @@ import { EditContactDialog } from "@/components/edit-contact-dialog";
 import { DeleteContactButton } from "@/components/delete-contact-button";
 import { EmailTemplatePickerModal } from "@/components/email-template-picker-modal";
 import { ContactFilterBar } from "./filter-bar";
+import { formatDateVN } from "@/lib/date";
 
 export const dynamic = "force-dynamic";
 
@@ -34,15 +35,6 @@ export const metadata = {
 };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const VN_TZ = "Asia/Ho_Chi_Minh";
-
-function formatDate(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  // Đặt timeZone VN tường minh: server Vercel chạy UTC (Phụ lục F).
-  return d.toLocaleDateString("vi-VN", { timeZone: VN_TZ });
-}
 
 function errorMessage(reason: unknown): string {
   return reason instanceof Error ? reason.message : "Đã có lỗi khi tải dữ liệu.";
@@ -168,7 +160,7 @@ export default async function ContactsPage({
                   <td className="px-3 py-2 text-muted-foreground">{c.work_email || "—"}</td>
                   <td className="px-3 py-2 text-muted-foreground">{c.phone_number || "—"}</td>
                   <td className="px-3 py-2 text-muted-foreground">{c.found_source || "—"}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{formatDate(c.last_contacted_date)}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{formatDateVN(c.last_contacted_date)}</td>
                   <td className="px-3 py-2">
                     <ContactStatusCell companyId={c.company_id} contactId={c.contact_id} status={c.contact_status} />
                   </td>

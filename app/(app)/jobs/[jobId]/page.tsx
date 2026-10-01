@@ -20,13 +20,7 @@ import { listMyApplications } from "@/lib/api/me";
 import { JobStatusPanel } from "./job-status-panel";
 import { ApplySection } from "./apply-section";
 import { ViewCvButton } from "@/components/view-cv-button";
-
-function formatDate(iso: string | null): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("vi-VN");
-}
+import { formatDateVN } from "@/lib/date";
 
 /** Khớp filter |to_bullets bên Flask ở mức tối thiểu: mỗi dòng non-empty
  *  -> 1 đoạn <p>, giữ xuống dòng người dùng đã nhập thay vì gộp thành 1
@@ -173,7 +167,7 @@ export default async function JobDetailPage({
                           {a.email}
                           {a.phone && ` · ${a.phone}`}
                         </p>
-                        <p className="text-muted-foreground">Ứng tuyển: {formatDate(a.applied_at)}</p>
+                        <p className="text-muted-foreground">Ứng tuyển: {formatDateVN(a.applied_at)}</p>
                         {a.note && <p className="text-muted-foreground">Ghi chú: {a.note}</p>}
                         {a.cv_url && <ViewCvButton applicationId={a.application_id} />}
                       </li>
@@ -199,7 +193,7 @@ export default async function JobDetailPage({
                           {s.email}
                           {s.phone && ` · ${s.phone}`}
                         </p>
-                        <p className="text-muted-foreground">Đã lưu: {formatDate(s.created_at)}</p>
+                        <p className="text-muted-foreground">Đã lưu: {formatDateVN(s.created_at)}</p>
                       </li>
                     ))}
                   </ul>
@@ -229,7 +223,7 @@ export default async function JobDetailPage({
               </div>
               <div className="flex justify-between gap-2">
                 <dt className="text-muted-foreground">Deadline</dt>
-                <dd>{formatDate(job.deadline)}</dd>
+                <dd>{formatDateVN(job.deadline)}</dd>
               </div>
               <div className="flex justify-between gap-2">
                 <dt className="text-muted-foreground">Link JD gốc</dt>
@@ -245,7 +239,7 @@ export default async function JobDetailPage({
               </div>
               <div className="flex justify-between gap-2">
                 <dt className="text-muted-foreground">Ngày thu thập</dt>
-                <dd>{formatDate(job.dateCollected)}</dd>
+                <dd>{formatDateVN(job.dateCollected)}</dd>
               </div>
             </dl>
           </section>
