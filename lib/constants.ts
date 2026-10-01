@@ -184,3 +184,62 @@ export const CONTACT_STATUS_LABELS: Record<string, string> = {
 // KHÁC Flask (gửi nhãn tiếng Việt rồi tra CONTACT_STATUS_MAP_REV), ở đây
 // gửi thẳng mã, tra nhãn hiển thị qua CONTACT_STATUS_LABELS ở trên.
 export const CONTACT_STATUS_CODES = ["UNCONTACTED", "EMAIL_SENT", "RESPONDED", "IN_PARTNERSHIP"] as const;
+
+// ---------------------------------------------------------------------------
+// Nhóm 3, Đợt 3.4 — /activity-logs (Lịch sử thao tác). Khớp ACTION_TYPE_MAP
+// / ENTITY_TYPE_MAP ở crawler_client/audit_logs.py bên Flask (12 action, 4
+// loại đối tượng — khớp danh sách trong mô tả `action_type`/`entity_type`
+// của GET /audit-logs).
+//
+// Theo nguyên tắc plan Nhóm 3: KEY (JOB/COMPANY/...) là thứ gửi lên API,
+// NHÃN tiếng Việt chỉ để hiển thị — luôn tra qua bảng này, không suy ra
+// lẫn nhau.
+
+export const AUDIT_ACTION_LABELS: Record<string, string> = {
+  CREATE_JOB: "Thêm JD",
+  UPDATE_JOB: "Sửa JD",
+  DELETE_JOB: "Xoá JD",
+  CREATE_COMPANY: "Thêm công ty",
+  UPDATE_COMPANY: "Sửa công ty",
+  DELETE_COMPANY: "Xoá công ty",
+  CREATE_CONTACT: "Thêm người liên hệ",
+  UPDATE_CONTACT: "Sửa người liên hệ",
+  DELETE_CONTACT: "Xoá người liên hệ",
+  ASSIGN_CONTACT: "Gán người phụ trách",
+  APPLY_JOB: "Ứng viên nộp CV",
+  WITHDRAW_JOB_APPLICATION: "Ứng viên huỷ ứng tuyển",
+};
+
+/** Key đối tượng (gửi API `entity_type`) -> nhãn hiển thị. Thứ tự = thứ tự
+ *  option của dropdown lọc ở phần sau của Đợt 3.4. */
+export const AUDIT_ENTITY_LABELS: Record<string, string> = {
+  JOB: "JD",
+  COMPANY: "Công ty",
+  CONTACT: "Người liên hệ",
+  APPLICATION: "Đơn ứng tuyển",
+};
+
+export type AuditActionTone = "success" | "warning" | "danger" | "neutral";
+
+/**
+ * Màu badge hành động theo `action_type` (KHÔNG dò chữ trong nhãn tiếng
+ * Việt như Flask — bên đó "Gán người phụ trách"/"Ứng viên nộp CV"/"Ứng
+ * viên huỷ" đều rơi vào nhánh `else` và bị tô đỏ như xoá):
+ *   CREATE_* / APPLY_*              -> xanh
+ *   UPDATE_* / ASSIGN_*             -> vàng
+ *   DELETE_* / WITHDRAW_*           -> đỏ
+ *   action lạ (backend thêm mới)    -> xám, không đoán bừa
+ */
+export function auditActionTone(actionType: string): AuditActionTone {
+  if (actionType.startsWith("CREATE_") || actionType.startsWith("APPLY_")) return "success";
+  if (actionType.startsWith("UPDATE_") || actionType.startsWith("ASSIGN_")) return "warning";
+  if (actionType.startsWith("DELETE_") || actionType.startsWith("WITHDRAW_")) return "danger";
+  return "neutral";
+}
+
+export const AUDIT_ACTION_TONE_CLASSES: Record<AuditActionTone, string> = {
+  success: "bg-[var(--brand-teal-soft)] text-[var(--brand-teal)]",
+  warning: "bg-[var(--brand-amber-soft)] text-[var(--brand-amber)]",
+  danger: "bg-destructive/10 text-destructive",
+  neutral: "bg-[#EDEFEC] text-muted-foreground",
+};
