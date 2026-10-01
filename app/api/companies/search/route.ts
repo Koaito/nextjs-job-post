@@ -13,9 +13,9 @@
 //
 // GET /companies là route PUBLIC của backend, nhưng route này vẫn chỉ cho
 // staff gọi: nó chỉ phục vụ trang Quản trị, không có lý do mở cho học viên.
-// Công ty đã xoá mềm KHÔNG nằm trong kết quả (backend mặc định ẩn) — đúng
-// ý nghĩa của ô lọc "công ty đang dùng"; log cũ của công ty đã xoá vẫn xem
-// được qua link ở cột "Công ty liên quan" / không lọc theo công ty.
+// Kết quả GỒM CẢ công ty đã xoá mềm (include_inactive=true): trang này là
+// nhật ký lịch sử, log DELETE_COMPANY và mọi log cũ của công ty đã xoá phải
+// lọc được. Mỗi dòng trả thêm `active` để ô chọn gắn nhãn "(đã xoá)".
 
 import { NextResponse } from "next/server";
 import { ApiError } from "@/lib/api/client";
@@ -42,10 +42,14 @@ export async function GET(req: Request) {
   const q = (new URL(req.url).searchParams.get("q") ?? "").trim().slice(0, MAX_QUERY_LENGTH);
 
   try {
-    const res = await listCompanies({ q: q || undefined }, { limit: SEARCH_LIMIT, offset: 0 });
+    const res = await listCompanies(
+      { q: q || undefined },
+      { limit: SEARCH_LIMIT, offset: 0 },
+      { includeInactive: true },
+    );
     return NextResponse.json(
       {
-        items: res.items.map((c) => ({ id: c.company_id, name: c.company_name })),
+        items: res.items.map((c) => ({ id: c.company_id, name: c.company_name, active: c.is_active })),
         total: res.total,
       },
       { headers: NO_STORE },

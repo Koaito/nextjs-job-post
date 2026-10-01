@@ -21,6 +21,8 @@ const DEBOUNCE_MS = 300;
 interface CompanyHit {
   id: string;
   name: string;
+  /** false = công ty đã xoá mềm (vẫn lọc được log của nó). */
+  active?: boolean;
 }
 
 export function CompanyFilterCombobox({
@@ -130,6 +132,7 @@ export function CompanyFilterCombobox({
                   onSelect={() => choose(c)}
                 >
                   {c.name}
+                  {c.active === false && <span className="ml-1 text-xs text-muted-foreground">(đã xoá)</span>}
                 </CommandItem>
               ))}
               {!loading && !error && items.length === 0 && <CommandEmpty>Không tìm thấy công ty nào.</CommandEmpty>}

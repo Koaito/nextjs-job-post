@@ -191,10 +191,13 @@ export interface CompanyFilters {
 export async function listCompanies(
   filters: CompanyFilters,
   { limit, offset }: { limit: number; offset: number },
+  /** true = gồm cả công ty đã xoá mềm (backend: ?include_inactive=true). */
+  { includeInactive = false }: { includeInactive?: boolean } = {},
 ): Promise<PaginatedCompanies> {
   const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
   if (filters.q) params.set("keyword", filters.q);
   if (filters.city) params.set("province", filters.city);
+  if (includeInactive) params.set("include_inactive", "true");
   return callPublic<PaginatedCompanies>(`/companies?${params.toString()}`);
 }
 
