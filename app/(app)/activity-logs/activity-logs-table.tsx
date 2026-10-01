@@ -9,9 +9,13 @@
 //  - actor_id trống -> "Hệ thống (tự động)"; có actor_id mà tên trống ->
 //    "Tài khoản đã bị xoá" (backend ghi rõ tên trống có thể do tài khoản đã
 //    xoá). Flask gộp 2 trường hợp làm một.
-//  - Log DELETE_*: KHÔNG gắn link tới đối tượng (đã xoá -> link ra 404),
-//    chỉ hiện entity_label snapshot dạng chữ. Cột "Công ty liên quan" của
-//    DELETE_COMPANY cũng không link vì company_id chính là công ty đã xoá.
+//  - Log DELETE_JOB / DELETE_COMPANY VẪN link tới đối tượng (Phần 2/5 đổi
+//    từ "không link" của Phần 1): backend không xoá thật mà xoá mềm — JD
+//    chỉ đóng (PATCH job_status=CLOSED, không có endpoint DELETE), công ty
+//    đặt is_active=false — nên đối tượng vẫn còn, kèm nhãn nhỏ "(đã đóng)"
+//    / "(đã xoá)" để biết ngay đây là log xoá. Nhãn phản ánh THAO TÁC của
+//    log, không phải trạng thái hiện tại (job có thể đã mở lại sau đó).
+//    DELETE_CONTACT không có trang chi tiết riêng nên chỉ hiện chữ.
 //  - Không tô nổi dòng "note_required mà thiếu note" (highlight-required):
 //    backend chặn cứng từ lúc ghi nên log bắt buộc luôn có note.
 //  - Giờ qua formatDateTimeVN (giờ VN, không phụ thuộc múi giờ máy chạy).
@@ -35,19 +39,25 @@ function actorName(log: AuditLogOut): { text: string; muted: boolean } {
   return { text: log.actor_name, muted: false };
 }
 
+/** Nhãn nhỏ sau tên đối tượng cho log xoá/đóng (chỉ JOB/COMPANY — 2 loại
+ *  có link). */
+const DELETED_HINT: Record<string, string> = {
+  DELETE_JOB: "(đã đóng)",
+  DELETE_COMPANY: "(đã xoá)",
+};
+
 function EntityCell({ log }: { log: AuditLogOut }) {
   const typeLabel = AUDIT_ENTITY_LABELS[log.entity_type] ?? log.entity_type;
-  const isDelete = log.action_type.startsWith("DELETE_");
   // Chỉ JOB/COMPANY có trang chi tiết để link (Flask: CONTACT/APPLICATION
-  // chỉ hiện chữ). Đối tượng đã xoá thì không link.
-  const href =
-    !isDelete && log.entity_id
-      ? log.entity_type === "JOB"
-        ? `/jobs/${log.entity_id}`
-        : log.entity_type === "COMPANY"
-          ? `/companies/${log.entity_id}`
-          : null
-      : null;
+  // chỉ hiện chữ).
+  const href = log.entity_id
+    ? log.entity_type === "JOB"
+      ? `/jobs/${log.entity_id}`
+      : log.entity_type === "COMPANY"
+        ? `/companies/${log.entity_id}`
+        : null
+    : null;
+  const hint = href ? DELETED_HINT[log.action_type] : undefined;
 
   return (
     <>
@@ -59,20 +69,19 @@ function EntityCell({ log }: { log: AuditLogOut }) {
       ) : (
         <span className="text-muted-foreground">{log.entity_label || "—"}</span>
       )}
+      {hint && <span className="ml-1 text-xs text-muted-foreground">{hint}</span>}
     </>
   );
 }
 
 function CompanyCell({ log }: { log: AuditLogOut }) {
   if (!log.company_id) return <span className="text-muted-foreground">—</span>;
-  // DELETE_COMPANY: company_id là công ty vừa bị xoá -> không link; tên
-  // hiện tại (join sống) đã trống nên dùng nhãn snapshot lúc ghi log.
-  if (log.action_type === "DELETE_COMPANY") {
-    return <span className="text-muted-foreground">{log.company_name || log.entity_label || "—"}</span>;
-  }
+  // DELETE_COMPANY: công ty chỉ bị xoá mềm nên vẫn link; nếu tên hiện tại
+  // (join sống) trống thì dùng nhãn snapshot lúc ghi log.
+  const name = log.company_name || (log.action_type === "DELETE_COMPANY" ? log.entity_label : "") || "—";
   return (
     <Link href={`/companies/${log.company_id}`} className="underline">
-      {log.company_name || "—"}
+      {name}
     </Link>
   );
 }
