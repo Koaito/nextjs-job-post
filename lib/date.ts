@@ -110,3 +110,19 @@ export function formatShortDateTimeVN(value: string | null | undefined): string 
   if (Number.isNaN(parsed.getTime())) return "";
   return VN_SHORT_DATETIME_FORMAT.format(parsed).replace(",", "");
 }
+
+// Giờ của 1 tin nhắn trong khung chat: "HH:mm dd/MM" (Flask: format_date(
+// '%H:%M %d/%m') ở messages_thread.html — NGƯỢC thứ tự với cột giờ ở danh
+// sách hội thoại). Bản Flask phần tin polling còn tự format bằng giờ của
+// TRÌNH DUYỆT (getHours) trong khi tin tải sẵn dùng giờ server -> 2 nguồn có
+// thể lệch giờ; ở đây mọi tin đều theo giờ VN. Ghép từ formatToParts thay vì
+// replace chuỗi để không phụ thuộc dấu phân cách của locale.
+export function formatMessageTimeVN(value: string | null | undefined): string {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  const parts = Object.fromEntries(
+    VN_SHORT_DATETIME_FORMAT.formatToParts(parsed).map((p) => [p.type, p.value]),
+  );
+  return `${parts.hour}:${parts.minute} ${parts.day}/${parts.month}`;
+}

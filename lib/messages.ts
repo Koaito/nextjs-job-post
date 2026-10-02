@@ -37,3 +37,19 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export function isUuid(value: unknown): value is string {
   return typeof value === "string" && UUID_RE.test(value);
 }
+
+/** 2 id có phải cùng 1 người không (so không phân biệt hoa/thường, vì UUID
+ *  gõ tay trên URL có thể viết hoa). Dùng chặn tự chat với chính mình. */
+export function isSameUserId(a: string | null | undefined, b: string | null | undefined): boolean {
+  return !!a && !!b && a.toLowerCase() === b.toLowerCase();
+}
+
+/** Tham số query có thể là chuỗi, mảng (?name=a&name=b) hoặc không có. */
+export function firstParam(value: string | string[] | undefined): string {
+  return (Array.isArray(value) ? value[0] : value) ?? "";
+}
+
+/** Tên người đối thoại tối đa 100 ký tự khi lấy từ URL (full_name backend
+ *  cho tới 255, nhưng đây chỉ là gợi ý dự phòng — không để URL tự đặt 1
+ *  chuỗi dài làm vỡ tiêu đề). */
+export const PARTNER_NAME_FROM_URL_MAX = 100;

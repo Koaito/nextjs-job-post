@@ -1,7 +1,9 @@
 // lib/api/messages.ts
 // Tương đương phần list_conversations / list_pending_requests / search_people
-// / accept|decline|block|unblock của backend_auth.py bên Flask. Nhóm 4
-// (Messages), Phần 1/3. Phần 2/3 sẽ thêm lịch sử + polling, Phần 3/3 thêm
+// / accept|decline|block|unblock / get_message_history / mark_messages_read
+// của backend_auth.py bên Flask. Nhóm 4 (Messages). Phần 1/3: danh sách +
+// quản lý quan hệ. Phần 2/3 (nửa đầu): getConversation, getMessageHistory,
+// markMessagesRead. Nửa sau của phần 2 thêm polling "since"; phần 3/3 thêm
 // gửi tin + huỷ request.
 //
 // Mọi hàm đi qua callAuthed() (JWT bắt buộc, mặc định no-store). Rate limit
@@ -17,6 +19,13 @@ export type ConversationOut = components["schemas"]["ConversationOut"];
 export type PendingRequestOut = components["schemas"]["PendingRequestOut"];
 export type PersonSearchResult = components["schemas"]["PersonSearchResult"];
 export type RelationshipOut = components["schemas"]["RelationshipOut"];
+export type ChatMessageOut = components["schemas"]["ChatMessageOut"];
+
+/** Số tin tải cho 1 lần mở thread — khớp limit=50 của Flask (thread()). */
+export const MESSAGE_HISTORY_PAGE_SIZE = 50;
+
+/** error_code backend gắn cho 404 của GET /messages/conversations/{id}. */
+export const PARTNER_NOT_FOUND_CODE = "message_partner_not_found";
 
 /** Backend ràng buộc q: 1..100 ký tự (Query min_length=1, max_length=100). */
 export const SEARCH_PEOPLE_MAX_LENGTH = 100;
@@ -82,4 +91,59 @@ export async function unblockMessageRelationship(relationshipId: string): Promis
     `/messages/relationships/${encodeURIComponent(relationshipId)}/unblock`,
     { method: "POST" },
   );
+}
+
+/**
+ * GET /messages/conversations/{partner_id} — tra ĐÚNG 1 người đối thoại: tên,
+ * role, relationship_status, relationship_id, kể cả khi 2 bên chưa từng nhắn
+ * (khi đó các field quan hệ = null). Thay cho việc tin vào ?name=&role= trên
+ * URL và cho việc staff phải kéo cả /conversations (giới hạn 10 lần/phút)
+ * chỉ để lấy quan hệ của 1 người — plan mục 9 (đề xuất endpoint này).
+ *
+ * 404 nghĩa là "không tồn tại HOẶC bạn không được phép thấy người này" (backend
+ * cố ý gộp để không lộ user_id nào có thật); nếu 2 bên đã có tin/quan hệ thì
+ * endpoint này luôn tìm thấy, nên 404 không bao giờ che mất 1 lịch sử có thật.
+ */
+export async function getConversation(partnerId: string): Promise<ConversationOut> {
+  return callAuthed<ConversationOut>(`/messages/conversations/${encodeURIComponent(partnerId)}`);
+}
+
+/**
+ * Chỉ true với ĐÚNG 404 mang mã MESSAGE_PARTNER_NOT_FOUND. Cố ý KHÔNG coi mọi
+ * 404 là "không tìm thấy người": backend cũ chưa có route này cũng trả 404
+ * (body dạng chuỗi, không có error_code) và khi đó TOÀN BỘ thread sẽ thành
+ * trang 404 oan.
+ */
+export function isPartnerNotFound(err: unknown): boolean {
+  return err instanceof ApiError && err.status === 404 && err.errorCode === PARTNER_NOT_FOUND_CODE;
+}
+
+/**
+ * GET /messages/with/{partner_id}?limit= — lịch sử 2 người, backend trả MỚI
+ * NHẤT TRƯỚC (ORDER BY id DESC, tối ưu cho cursor before_id). Hàm này đã sắp
+ * lại thành CŨ -> MỚI (id tăng dần) để khớp chiều đọc trên -> dưới; nơi gọi
+ * không được tự đảo thêm lần nữa. Sắp theo id chứ không đảo mảng, để vẫn đúng
+ * dù backend đổi thứ tự trả về.
+ *
+ * Cho xem kể cả khi quan hệ đang declined/blocked (backend chỉ chặn GỬI).
+ */
+export async function getMessageHistory(
+  partnerId: string,
+  limit: number = MESSAGE_HISTORY_PAGE_SIZE,
+): Promise<ChatMessageOut[]> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  const rows =
+    (await callAuthed<ChatMessageOut[]>(
+      `/messages/with/${encodeURIComponent(partnerId)}?${params}`,
+    )) ?? [];
+  return [...rows].sort((a, b) => a.id - b.id);
+}
+
+/** POST /messages/read/{partner_id} — đánh dấu mọi tin partner gửi cho mình
+ *  là đã đọc. Nơi gọi tự nuốt lỗi (plan: thao tác phụ không được làm hỏng
+ *  trang chat). */
+export async function markMessagesRead(partnerId: string): Promise<void> {
+  await callAuthed<unknown>(`/messages/read/${encodeURIComponent(partnerId)}`, {
+    method: "POST",
+  });
 }
