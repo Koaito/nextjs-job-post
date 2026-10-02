@@ -55,6 +55,16 @@ export const ROLE_LABELS: Record<string, string> = {
   admin: "Admin",
 };
 
+// Nhãn trạng thái quan hệ chat (Nhóm 4 — Messages). Khớp dict inline trong
+// messages.html (Flask). "accepted" cố ý KHÔNG có nhãn: quan hệ bình thường
+// thì không hiện chip (chỉ hiện khi pending/declined/blocked). Mã lạ backend
+// thêm sau này thì nơi hiển thị in thẳng mã thô thay vì ẩn.
+export const RELATIONSHIP_STATUS_LABELS: Record<string, string> = {
+  pending: "Đang chờ",
+  declined: "Đã từ chối",
+  blocked: "Đã chặn",
+};
+
 // ---------------------------------------------------------------------------
 // Nhóm 1 — Jobs. Copy y hệt constants.py + crawler_client/jobs.py bên
 // Flask (chỉ *_MAP hardcode, KHÔNG động như level_code — xem

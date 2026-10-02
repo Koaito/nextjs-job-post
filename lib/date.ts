@@ -91,3 +91,22 @@ export function formatDateTimeVN(value: string | null | undefined): string {
   if (Number.isNaN(parsed.getTime())) return "—";
   return VN_DATETIME_FORMAT.format(parsed).replace(",", "");
 }
+
+// Bản rút gọn của formatDateTimeVN() — bỏ năm: "dd/mm HH:mm". Khớp
+// format_date('%d/%m %H:%M') ở cột giờ tin nhắn cuối của messages.html
+// (Flask). Cố ý đặt hourCycle "h23" để 00:05 không hiện thành "24:05".
+const VN_SHORT_DATETIME_FORMAT = new Intl.DateTimeFormat("en-GB", {
+  timeZone: VN_TZ,
+  day: "2-digit",
+  month: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+export function formatShortDateTimeVN(value: string | null | undefined): string {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return VN_SHORT_DATETIME_FORMAT.format(parsed).replace(",", "");
+}
