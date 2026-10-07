@@ -19,6 +19,7 @@
 //    không để trang vỡ.
 
 import {
+  CLOSED_REASON_LABELS,
   CONTACT_STATUS_LABELS,
   JOB_STATUS_LABELS,
   PARTNERSHIP_POTENTIAL_LABELS,
@@ -45,6 +46,8 @@ const FIELD_LABELS: Record<string, Record<string, string>> = {
     salary_period: "Chu kỳ lương",
     deadline: "Hạn nộp",
     job_status: "Trạng thái",
+    // Log REOPEN_JOB ghi closed_reason cũ -> null (cột job_postings.closed_reason, A2).
+    closed_reason: "Lý do đóng",
     ss_team_notes: "Ghi chú nội bộ SS",
     // Các cột log MERGE_JOB của job giữ có thể ghi (db/job_merge.py::
     // _WRITABLE_JOB_COLUMNS). level_id là UUID nên chỉ có nhãn, không có tên cấp bậc.
@@ -93,6 +96,7 @@ const FIELD_LABELS: Record<string, Record<string, string>> = {
 /** Giá trị enum -> nhãn tiếng Việt, theo tên trường. */
 const VALUE_LABELS: Record<string, Record<string, string>> = {
   job_status: JOB_STATUS_LABELS,
+  closed_reason: CLOSED_REASON_LABELS,
   work_type: WORK_TYPE_LABELS,
   salary_type: SALARY_TYPE_LABELS,
   salary_period: SALARY_PERIOD_LABELS,

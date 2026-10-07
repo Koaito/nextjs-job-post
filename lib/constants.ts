@@ -87,6 +87,14 @@ export const JOB_STATUS_LABELS: Record<string, string> = {
   OPEN: "Đang tuyển",
   CLOSED: "Đã đóng",
 };
+// Lý do job CLOSED (cột job_postings.closed_reason, backend A2). Chỉ để hiện trong log
+// thay đổi; chưa có bộ lọc nào dùng.
+export const CLOSED_REASON_LABELS: Record<string, string> = {
+  staff: "Nhân viên đóng",
+  expired_auto: "Hệ thống tự đóng (hết hạn/tin chết)",
+  merged: "Đã gộp",
+  unknown: "Không rõ",
+};
 export const JOB_STATUS_LABELS_REV: Record<string, string> = Object.fromEntries(
   Object.entries(JOB_STATUS_LABELS).map(([code, label]) => [label, code]),
 );
@@ -233,6 +241,11 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   // Không bắt đầu bằng CREATE_/UPDATE_/DELETE_ nên auditActionTone trả xám — chủ
   // ý: đây là thao tác dọn dữ liệu của hệ thống, không phải lỗi/xoá của nhân viên.
   MERGE_JOB: "Gộp JD trùng",
+  // Pipeline tự mở lại job đã đóng khi gặp tin đăng lại (db/job_recrawl.py::
+  // reopen_job_for_repost, A2). Actor NULL nên hiện "Hệ thống (tự động)". Giống MERGE_JOB:
+  // không bắt đầu bằng CREATE_/UPDATE_/DELETE_ nên auditActionTone trả xám, job vẫn còn
+  // nên EntityCell link được tới trang chi tiết.
+  REOPEN_JOB: "Tự mở lại JD (tin đăng lại)",
 };
 
 /** Key đối tượng (gửi API `entity_type`) -> nhãn hiển thị. Thứ tự = thứ tự

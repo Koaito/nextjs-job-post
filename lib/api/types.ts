@@ -2366,7 +2366,7 @@ export interface components {
             actor_name?: string | null;
             /**
              * Action Type
-             * @description CREATE_JOB | UPDATE_JOB | DELETE_JOB | CREATE_COMPANY | UPDATE_COMPANY | DELETE_COMPANY | CREATE_CONTACT | UPDATE_CONTACT | DELETE_CONTACT | ASSIGN_CONTACT | APPLY_JOB | WITHDRAW_JOB_APPLICATION | BULK_IMPORT_JOB | BULK_IMPORT_COMPANY | BULK_IMPORT_CONTACT | CREATE_EMAIL_TEMPLATE | UPDATE_EMAIL_TEMPLATE | DELETE_EMAIL_TEMPLATE | MERGE_JOB
+             * @description CREATE_JOB | UPDATE_JOB | DELETE_JOB | CREATE_COMPANY | UPDATE_COMPANY | DELETE_COMPANY | CREATE_CONTACT | UPDATE_CONTACT | DELETE_CONTACT | ASSIGN_CONTACT | APPLY_JOB | WITHDRAW_JOB_APPLICATION | BULK_IMPORT_JOB | BULK_IMPORT_COMPANY | BULK_IMPORT_CONTACT | CREATE_EMAIL_TEMPLATE | UPDATE_EMAIL_TEMPLATE | DELETE_EMAIL_TEMPLATE | MERGE_JOB | REOPEN_JOB
              */
             action_type: string;
             /**
@@ -6855,7 +6855,7 @@ export interface operations {
                 company_id?: string | null;
                 /** @description Lọc log do 1 thành viên ss_team/admin cụ thể thực hiện */
                 actor_id?: string | null;
-                /** @description CREATE_JOB | UPDATE_JOB | DELETE_JOB | CREATE_COMPANY | UPDATE_COMPANY | DELETE_COMPANY | CREATE_CONTACT | UPDATE_CONTACT | DELETE_CONTACT | ASSIGN_CONTACT | APPLY_JOB | WITHDRAW_JOB_APPLICATION | BULK_IMPORT_JOB | BULK_IMPORT_COMPANY | BULK_IMPORT_CONTACT | CREATE_EMAIL_TEMPLATE | UPDATE_EMAIL_TEMPLATE | DELETE_EMAIL_TEMPLATE | MERGE_JOB */
+                /** @description CREATE_JOB | UPDATE_JOB | DELETE_JOB | CREATE_COMPANY | UPDATE_COMPANY | DELETE_COMPANY | CREATE_CONTACT | UPDATE_CONTACT | DELETE_CONTACT | ASSIGN_CONTACT | APPLY_JOB | WITHDRAW_JOB_APPLICATION | BULK_IMPORT_JOB | BULK_IMPORT_COMPANY | BULK_IMPORT_CONTACT | CREATE_EMAIL_TEMPLATE | UPDATE_EMAIL_TEMPLATE | DELETE_EMAIL_TEMPLATE | MERGE_JOB | REOPEN_JOB */
                 action_type?: string | null;
                 /** @description true = CHỈ log đang chờ note (note_required=true, note còn trống) — dùng cho badge nhắc nhở. Chỉ có ý nghĩa khi view=manual (view=auto luôn bỏ qua tham số này vì log tự động không có khái niệm note). */
                 pending_note?: boolean | null;
