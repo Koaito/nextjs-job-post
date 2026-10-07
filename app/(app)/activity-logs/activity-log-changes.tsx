@@ -1,6 +1,7 @@
 // app/(app)/activity-logs/activity-log-changes.tsx
 // Nội dung dòng con "Xem thay đổi" — mỗi dòng "tên trường: cũ -> mới" — Nhóm
-// 3, Đợt 3.4, Phần 5/5. Server Component thuần; dữ liệu đã chuẩn hoá ở
+// 3, Đợt 3.4, Phần 5/5. Dòng kind="info" (log MERGE_JOB) chỉ hiện một giá trị,
+// không có mũi tên. Server Component thuần; dữ liệu đã chuẩn hoá ở
 // lib/audit-changes.ts. Toàn bộ giá trị là text thuần (JSX tự escape), tuyệt
 // đối không dangerouslySetInnerHTML (plan Nhóm 4).
 
@@ -31,15 +32,24 @@ export function ActivityLogChanges({ rows }: { rows: ChangeRow[] }) {
           <dt className={cn("font-medium", !row.labelKnown && "font-mono text-xs text-muted-foreground")}>
             {row.label}
           </dt>
-          <dd className="min-w-0">
-            <Value value={row.old} tone="old" />
-          </dd>
-          <dd aria-hidden className="hidden text-muted-foreground sm:block">
-            →
-          </dd>
-          <dd className="min-w-0">
-            <Value value={row.new} tone="new" />
-          </dd>
+          {row.kind === "info" ? (
+            // Dòng thông tin (log MERGE_JOB): chỉ một giá trị, không có "cũ -> mới".
+            <dd className="min-w-0 sm:col-span-3">
+              <Value value={row.new} tone="new" />
+            </dd>
+          ) : (
+            <>
+              <dd className="min-w-0">
+                <Value value={row.old} tone="old" />
+              </dd>
+              <dd aria-hidden className="hidden text-muted-foreground sm:block">
+                →
+              </dd>
+              <dd className="min-w-0">
+                <Value value={row.new} tone="new" />
+              </dd>
+            </>
+          )}
         </div>
       ))}
     </dl>

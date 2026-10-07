@@ -10,6 +10,10 @@
 //    giá trị là ss_user_id) lẫn DELETE_JOB khi đóng JD kèm sửa field khác —
 //    tài liệu API ghi "chỉ UPDATE_*" nhưng code backend thì không, nên hiển
 //    thị theo "có changes" chứ không theo action_type.
+//  - Log MERGE_JOB (gộp job trùng) có `changes` KHÔNG theo dạng {field: {old,
+//    new}} (merged_into, snapshot, merged_from...): các khoá đó chuyển sang
+//    lib/audit-merge.ts, trả về dòng kind="info" (chỉ một giá trị, không có
+//    "cũ -> mới"). Cột job_postings đổi ở log của job giữ vẫn đi đường cũ.
 //  - Giá trị là JSON bất kỳ (chuỗi/số/bool/null/mảng/object, ngày dạng chuỗi
 //    do default=str). Không giả định kiểu: gặp dạng lạ thì in JSON thô,
 //    không để trang vỡ.
@@ -23,6 +27,7 @@ import {
   WORK_TYPE_LABELS,
 } from "@/lib/constants";
 import { formatDateVN } from "@/lib/date";
+import { MERGE_INFO_KEYS, buildMergeRows } from "@/lib/audit-merge";
 
 /** Nhãn tên trường THEO entity_type — `job_title` là "Tiêu đề JD" ở JD nhưng
  *  là "Chức danh" ở người liên hệ, nên không dùng được 1 bảng chung. */
@@ -41,6 +46,13 @@ const FIELD_LABELS: Record<string, Record<string, string>> = {
     deadline: "Hạn nộp",
     job_status: "Trạng thái",
     ss_team_notes: "Ghi chú nội bộ SS",
+    // Các cột log MERGE_JOB của job giữ có thể ghi (db/job_merge.py::
+    // _WRITABLE_JOB_COLUMNS). level_id là UUID nên chỉ có nhãn, không có tên cấp bậc.
+    source_url: "Link tin gốc",
+    level_id: "Cấp bậc (mã nội bộ)",
+    level_source: "Nguồn xác định cấp bậc",
+    level_rule_version: "Phiên bản luật cấp bậc",
+    level_signals: "Tín hiệu suy ra cấp bậc",
     "parsed_content.job_description": "Mô tả công việc",
     "parsed_content.requirements": "Yêu cầu",
     "parsed_content.perks": "Quyền lợi",
@@ -92,6 +104,9 @@ const DATE_FIELDS = new Set(["deadline", "last_contacted_date"]);
 const NUMBER_FIELDS = new Set(["salary_min", "salary_max"]);
 
 export interface ChangeRow {
+  /** "diff" = thay đổi cũ -> mới. "info" = chỉ một giá trị thông tin (nằm ở
+   *  `new`, `old` luôn trống) — dùng cho log MERGE_JOB, nơi không có "cũ -> mới". */
+  kind: "diff" | "info";
   /** Khoá thô (vd "salary_min"), dùng làm React key. */
   field: string;
   /** Nhãn tiếng Việt; trường lạ (backend thêm mới) giữ nguyên khoá thô. */
@@ -109,6 +124,9 @@ export type ChangeValue = { empty: true } | { empty: false; text: string; block:
 export interface ChangeContext {
   /** ss_user_id -> họ tên, để đổi `assigned_ss_user` từ UUID sang tên. */
   staffNames: Record<string, string>;
+  /** action_type của log. Chỉ MERGE_JOB cần (đọc các khoá đặc biệt của gộp job);
+   *  bỏ trống = coi mọi khoá là cột job/công ty/... như trước. */
+  actionType?: string;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -175,8 +193,11 @@ export function parseChanges(
   if (!isRecord(changes)) return [];
   const labels = FIELD_LABELS[entityType] ?? {};
   const raw: { field: string; old: unknown; new: unknown }[] = [];
+  const isMerge = ctx.actionType === "MERGE_JOB";
 
   for (const [field, entry] of Object.entries(changes)) {
+    // Khoá riêng của gộp job: không phải {old,new} nên không đi đường diff.
+    if (isMerge && MERGE_INFO_KEYS.has(field)) continue;
     // Đúng dạng backend: {old, new}. Dạng khác -> coi cả entry là giá trị mới.
     const pair = isRecord(entry) && ("old" in entry || "new" in entry) ? entry : { old: undefined, new: entry };
     if (field === "parsed_content") {
@@ -189,9 +210,10 @@ export function parseChanges(
     raw.push({ field, old: pair.old, new: pair.new });
   }
 
-  return raw.map((r) => {
+  const diffRows: ChangeRow[] = raw.map((r) => {
     const label = labels[r.field];
     return {
+      kind: "diff",
       field: r.field,
       label: label ?? r.field,
       labelKnown: label !== undefined,
@@ -199,4 +221,5 @@ export function parseChanges(
       new: formatValue(r.field, r.new, ctx),
     };
   });
+  return isMerge ? [...diffRows, ...buildMergeRows(changes)] : diffRows;
 }

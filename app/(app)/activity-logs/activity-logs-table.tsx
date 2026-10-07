@@ -20,6 +20,12 @@
 //    / "(đã xoá)" để biết ngay đây là log xoá. Nhãn phản ánh THAO TÁC của
 //    log, không phải trạng thái hiện tại (job có thể đã mở lại sau đó).
 //    DELETE_CONTACT không có trang chi tiết riêng nên chỉ hiện chữ.
+//  - Log MERGE_JOB (gộp job trùng bằng CLI): job PHỤ bị xoá THẬT khỏi DB, nên
+//    log của nó KHÔNG link tới /jobs/<id> (trước đây sẽ ra 404) mà hiện chữ +
+//    "(đã gộp vào job xxxxxxxx)" với link tới job giữ. Log của job GIỮ (cùng
+//    action, có changes.merged_from) vẫn link bình thường. Phân biệt bằng khoá
+//    changes.merged_into, xem mergedIntoJobId ở lib/audit-merge.ts. Phần
+//    changes của log gộp được tóm tắt gọn (không đổ nguyên snapshot JSON).
 //  - Không tô nổi dòng "note_required mà thiếu note" (highlight-required):
 //    backend chặn cứng từ lúc ghi nên log bắt buộc luôn có note.
 //  - Giờ qua formatDateTimeVN (giờ VN, không phụ thuộc múi giờ máy chạy).
@@ -41,6 +47,7 @@ import { formatDateTimeVN } from "@/lib/date";
 import { cn } from "@/lib/utils";
 import type { AuditLogOut } from "@/lib/api/audit-logs";
 import { parseChanges } from "@/lib/audit-changes";
+import { mergedIntoJobId } from "@/lib/audit-merge";
 import { ActivityLogChanges } from "./activity-log-changes";
 import { EditNoteButton } from "./edit-note-button";
 import { ExpandableLogRow } from "./expandable-log-row";
@@ -65,7 +72,9 @@ function EntityCell({ log }: { log: AuditLogOut }) {
   // BULK_IMPORT_*: entity_id là id phiên preview import (không phải id JD/
   // công ty/contact) nên link sẽ trỏ tới trang không tồn tại -> chỉ hiện chữ.
   // EMAIL_TEMPLATE: không có trang chi tiết riêng (xoá là xoá cứng) -> chỉ chữ.
-  const linkable = log.entity_id && !log.action_type.startsWith("BULK_IMPORT_");
+  // MERGE_JOB của job phụ: job đã bị xoá thật -> không link, chỉ trỏ tới job giữ.
+  const mergedInto = log.entity_type === "JOB" ? mergedIntoJobId(log.action_type, log.changes) : null;
+  const linkable = log.entity_id && !log.action_type.startsWith("BULK_IMPORT_") && !mergedInto;
   const href = linkable
     ? log.entity_type === "JOB"
       ? `/jobs/${log.entity_id}`
@@ -86,6 +95,15 @@ function EntityCell({ log }: { log: AuditLogOut }) {
         <span className="text-muted-foreground">{log.entity_label || "—"}</span>
       )}
       {hint && <span className="ml-1 text-xs text-muted-foreground">{hint}</span>}
+      {mergedInto && (
+        <span className="ml-1 text-xs text-muted-foreground">
+          (đã gộp vào{" "}
+          <Link href={`/jobs/${mergedInto}`} className="underline">
+            job {mergedInto.slice(0, 8)}
+          </Link>
+          )
+        </span>
+      )}
     </>
   );
 }
@@ -137,7 +155,10 @@ export function ActivityLogsTable({
           {logs.map((log) => {
             const actor = actorName(log);
             const tone = auditActionTone(log.action_type);
-            const changeRows = parseChanges(log.entity_type, log.changes, { staffNames });
+            const changeRows = parseChanges(log.entity_type, log.changes, {
+              staffNames,
+              actionType: log.action_type,
+            });
             return (
               <ExpandableLogRow
                 key={log.log_id}

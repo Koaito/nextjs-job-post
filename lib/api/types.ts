@@ -1135,6 +1135,12 @@ export interface paths {
          *     token bị đánh cắp (người dùng hợp lệ không có lý do dùng lại token đã
          *     đổi), phản ứng bằng cách thu hồi TOÀN BỘ token của user này, buộc
          *     đăng nhập lại trên mọi thiết bị.
+         *
+         *     NGOẠI LỆ (grace period, xem security.REFRESH_REUSE_GRACE_SECONDS):
+         *     nếu token thay thế (replaced_by_token_id) vẫn còn sống và việc revoke
+         *     vừa xảy ra trong vòng REFRESH_REUSE_GRACE_SECONDS giây, coi đây là
+         *     race hợp lệ giữa 2 request refresh song song (không phải bị đánh
+         *     cắp) và cấp thêm 1 cặp token mới thay vì đăng xuất toàn bộ.
          */
         post: operations["refresh_auth_refresh_post"];
         delete?: never;
@@ -1272,6 +1278,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/users/{ss_user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get User
+         * @description Thêm 10/2026 — xem đúng 1 tài khoản, shape GIỐNG HỆT 1 phần tử của
+         *     GET /auth/users, cùng quyền (ss_team trở lên, ss_team xem được cả
+         *     admin như ở danh sách). Thay cho việc frontend (trang /staff-activity/
+         *     [id], /student-activity/[id]) tải cả danh sách rồi lọc theo id — tốn
+         *     băng thông và chậm dần khi số tài khoản tăng.
+         *
+         *     400 USER_SS_USER_ID_INVALID_UUID nếu id sai dạng (cùng mã với
+         *     /users/{id}/applications), 404 USER_ACCOUNT_NOT_FOUND nếu không có.
+         */
+        get: operations["get_user_auth_users__ss_user_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/users/{ss_user_id}/applications": {
         parameters: {
             query?: never;
@@ -1374,9 +1407,10 @@ export interface paths {
          *
          *     Dùng khi 1 người rời nhóm/vi phạm cần chặn đăng nhập ngay — KHÁC
          *     locked_until (khoá TẠM THỜI, tự hết hạn do sai mật khẩu liên tiếp,
-         *     xem db.record_failed_login()). Vô hiệu hoá không revoke JWT access
-         *     token đang có hiệu lực (tối đa 30 phút) — xem docstring
-         *     db.update_user_active_status().
+         *     xem db.record_failed_login()). Có hiệu lực NGAY ở request kế tiếp của
+         *     người bị khoá: get_current_user() đọc is_active mới nhất từ DB mỗi
+         *     request và trả 403 AUTH_ACCOUNT_INACTIVE, kể cả khi access token
+         *     của họ còn hạn — xem docstring db.update_user_active_status().
          */
         patch: operations["update_user_active_status_auth_users__ss_user_id__active_status_patch"];
         trace?: never;
@@ -2332,12 +2366,12 @@ export interface components {
             actor_name?: string | null;
             /**
              * Action Type
-             * @description CREATE_JOB | UPDATE_JOB | DELETE_JOB | CREATE_COMPANY | UPDATE_COMPANY | DELETE_COMPANY | CREATE_CONTACT | UPDATE_CONTACT | DELETE_CONTACT | ASSIGN_CONTACT
+             * @description CREATE_JOB | UPDATE_JOB | DELETE_JOB | CREATE_COMPANY | UPDATE_COMPANY | DELETE_COMPANY | CREATE_CONTACT | UPDATE_CONTACT | DELETE_CONTACT | ASSIGN_CONTACT | APPLY_JOB | WITHDRAW_JOB_APPLICATION | BULK_IMPORT_JOB | BULK_IMPORT_COMPANY | BULK_IMPORT_CONTACT | CREATE_EMAIL_TEMPLATE | UPDATE_EMAIL_TEMPLATE | DELETE_EMAIL_TEMPLATE | MERGE_JOB
              */
             action_type: string;
             /**
              * Entity Type
-             * @description JOB | COMPANY | CONTACT
+             * @description JOB | COMPANY | CONTACT | APPLICATION | EMAIL_TEMPLATE. Riêng BULK_IMPORT_*: entity_type là JOB/COMPANY/CONTACT nhưng entity_id là id phiên preview import (KHÔNG phải id JD/công ty/contact) nên client không được dùng nó để dựng link chi tiết.
              */
             entity_type: string;
             /** Entity Id */
@@ -2356,7 +2390,7 @@ export interface components {
             company_name?: string | null;
             /**
              * Changes
-             * @description {field: {old, new}} — chỉ có ở action UPDATE_*, null cho CREATE/DELETE/ASSIGN.
+             * @description {field: {old, new}} — chỉ gồm field THỰC SỰ đổi giá trị. Có ở UPDATE_*, ASSIGN_CONTACT (field assigned_ss_user, giá trị là ss_user_id) và DELETE_JOB khi đóng JD kèm sửa field khác; null cho CREATE/DELETE còn lại. Client nên hiển thị theo 'có changes' chứ không theo action_type. Giá trị số của log MỚI là số thật; log cũ có thể là chuỗi số ("10000000.00").
              */
             changes?: {
                 [key: string]: unknown;
@@ -6447,6 +6481,37 @@ export interface operations {
             };
         };
     };
+    get_user_auth_users__ss_user_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ss_user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_applications_of_user_auth_users__ss_user_id__applications_get: {
         parameters: {
             query?: never;
@@ -6782,15 +6847,15 @@ export interface operations {
     list_audit_logs_audit_logs_get: {
         parameters: {
             query?: {
-                /** @description 'auto' = TẤT CẢ thao tác (không note). 'manual' = chỉ tập con action nhạy cảm (sửa/xoá JD, sửa/xoá company, mọi thao tác HR contact), kèm cột note. Đây là 2 CÁCH LỌC trên CÙNG 1 bảng dữ liệu — 'manual' luôn là tập con của 'auto', KHÔNG phải dữ liệu tách biệt. */
+                /** @description 'auto' = TẤT CẢ thao tác (không note). 'manual' = chỉ tập con action nhạy cảm (sửa/xoá JD, sửa/xoá company, mọi thao tác HR contact, nhập hàng loạt, mẫu email), kèm cột note. Đây là 2 CÁCH LỌC trên CÙNG 1 bảng dữ liệu — 'manual' luôn là tập con của 'auto', KHÔNG phải dữ liệu tách biệt. */
                 view?: "auto" | "manual";
-                /** @description JOB | COMPANY | CONTACT | APPLICATION */
+                /** @description JOB | COMPANY | CONTACT | APPLICATION | EMAIL_TEMPLATE. BULK_IMPORT_* ghi entity_type là JOB/COMPANY/CONTACT. */
                 entity_type?: string | null;
                 /** @description Lọc mọi hoạt động (JD + HR contact) liên quan 1 công ty cụ thể */
                 company_id?: string | null;
                 /** @description Lọc log do 1 thành viên ss_team/admin cụ thể thực hiện */
                 actor_id?: string | null;
-                /** @description CREATE_JOB | UPDATE_JOB | DELETE_JOB | CREATE_COMPANY | UPDATE_COMPANY | DELETE_COMPANY | CREATE_CONTACT | UPDATE_CONTACT | DELETE_CONTACT | ASSIGN_CONTACT | APPLY_JOB | WITHDRAW_JOB_APPLICATION */
+                /** @description CREATE_JOB | UPDATE_JOB | DELETE_JOB | CREATE_COMPANY | UPDATE_COMPANY | DELETE_COMPANY | CREATE_CONTACT | UPDATE_CONTACT | DELETE_CONTACT | ASSIGN_CONTACT | APPLY_JOB | WITHDRAW_JOB_APPLICATION | BULK_IMPORT_JOB | BULK_IMPORT_COMPANY | BULK_IMPORT_CONTACT | CREATE_EMAIL_TEMPLATE | UPDATE_EMAIL_TEMPLATE | DELETE_EMAIL_TEMPLATE | MERGE_JOB */
                 action_type?: string | null;
                 /** @description true = CHỈ log đang chờ note (note_required=true, note còn trống) — dùng cho badge nhắc nhở. Chỉ có ý nghĩa khi view=manual (view=auto luôn bỏ qua tham số này vì log tự động không có khái niệm note). */
                 pending_note?: boolean | null;

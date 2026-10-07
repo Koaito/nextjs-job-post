@@ -227,6 +227,12 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   CREATE_EMAIL_TEMPLATE: "Thêm mẫu email",
   UPDATE_EMAIL_TEMPLATE: "Sửa mẫu email",
   DELETE_EMAIL_TEMPLATE: "Xoá mẫu email",
+  // Gộp job trùng bằng CLI (`main.py merge-duplicates --apply`, backend Phần 3b).
+  // Mỗi job phụ bị XOÁ THẬT (khác DELETE_JOB là đóng mềm) nên log của job phụ
+  // KHÔNG được link tới trang chi tiết; xem EntityCell ở activity-logs-table.tsx.
+  // Không bắt đầu bằng CREATE_/UPDATE_/DELETE_ nên auditActionTone trả xám — chủ
+  // ý: đây là thao tác dọn dữ liệu của hệ thống, không phải lỗi/xoá của nhân viên.
+  MERGE_JOB: "Gộp JD trùng",
 };
 
 /** Key đối tượng (gửi API `entity_type`) -> nhãn hiển thị. Thứ tự = thứ tự
