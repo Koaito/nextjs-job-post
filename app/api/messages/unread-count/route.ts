@@ -47,6 +47,9 @@ export async function GET() {
     // tạm thời" và giãn dần khoảng poll.
     const status =
       err instanceof ApiError && err.status && err.status >= 400 ? err.status : 502;
-    return NextResponse.json({ ok: false }, { status, headers: NO_STORE });
+    // Kèm errorCode (nếu có) để client phân biệt "bị đăng nhập nơi khác" /
+    // "phiên bị thu hồi" với 401 hết hạn thường (Phụ lục C).
+    const errorCode = err instanceof ApiError ? err.errorCode : undefined;
+    return NextResponse.json({ ok: false, errorCode }, { status, headers: NO_STORE });
   }
 }

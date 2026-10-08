@@ -5,7 +5,8 @@
 
 import { redirect, notFound } from "next/navigation";
 import { headers } from "next/headers";
-import { getCurrentUser } from "@/lib/session";
+import { getSessionState } from "@/lib/session";
+import { loginUrl } from "@/lib/session-end";
 import type { BackendUser } from "@/lib/api/types-manual";
 
 /**
@@ -36,11 +37,13 @@ async function currentPath(): Promise<string> {
 }
 
 export async function requireUser(): Promise<BackendUser> {
-  const user = await getCurrentUser();
+  const { user, endReason } = await getSessionState();
   if (!user) {
     const path = await currentPath();
-    const next = safeInternalPath(path);
-    redirect(next ? `/login?next=${encodeURIComponent(next)}` : "/login");
+    // endReason != null khi phiên chết vì bị đăng nhập nơi khác thay / bị
+    // thu hồi (Phụ lục C) -> kèm ?reason= để /login hiện đúng thông báo.
+    // Hết hạn thường hoặc chưa đăng nhập: endReason null, redirect im lặng.
+    redirect(loginUrl({ next: safeInternalPath(path), reason: endReason }));
   }
   return user;
 }

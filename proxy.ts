@@ -44,6 +44,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isExpiredSoon } from "@/lib/jwt";
 import { clientIpHeaders } from "@/lib/client-ip";
+import { loginUrl, sessionEndReasonFromCode, type SessionEndReason } from "@/lib/session-end";
 import {
   ACCESS_COOKIE,
   REFRESH_COOKIE,
@@ -73,7 +74,8 @@ function isPublicJobRoute(p: string): boolean {
 
 type RefreshResult =
   | { ok: true; accessToken: string; refreshToken: string }
-  | { ok: false; reason: "invalid" | "error" };
+  | { ok: false; reason: "invalid"; endReason: SessionEndReason | null }
+  | { ok: false; reason: "error" };
 
 /**
  * Gọi thẳng /auth/refresh bằng fetch() (không qua lib/api/auth.ts —
@@ -115,7 +117,17 @@ async function tryRefresh(
     }
 
     if (res.status === 401 || res.status === 403) {
-      return { ok: false, reason: "invalid" };
+      // Đọc error_code để biết có phải "refresh token đã bị thu hồi vì đăng
+      // nhập nơi khác" không (Phụ lục C) — hết hạn thường thì endReason
+      // null, redirect /login im lặng như cũ. Body hỏng/không JSON -> null.
+      let endReason: SessionEndReason | null = null;
+      try {
+        const body = (await res.json()) as { detail?: { error_code?: string } };
+        endReason = sessionEndReasonFromCode(body?.detail?.error_code);
+      } catch {
+        // bỏ qua
+      }
+      return { ok: false, reason: "invalid", endReason };
     }
     return { ok: false, reason: "error" };
   } catch {
@@ -133,6 +145,7 @@ export async function proxy(req: NextRequest) {
 
   let newTokens: { access: string; refresh: string } | null = null;
   let shouldClearCookies = false;
+  let endReason: SessionEndReason | null = null;
 
   const needsRefresh = refreshToken !== null && (!accessToken || isExpiredSoon(accessToken));
 
@@ -144,6 +157,7 @@ export async function proxy(req: NextRequest) {
       refreshToken = result.refreshToken;
     } else if (result.reason === "invalid") {
       shouldClearCookies = true;
+      endReason = result.endReason;
       accessToken = null;
       refreshToken = null;
     }
@@ -158,9 +172,12 @@ export async function proxy(req: NextRequest) {
   // Route public KHÔNG redirect trong mọi trường hợp — chỉ khác ở chỗ
   // này, phần refresh phía trên áp dụng như nhau cho cả 2 loại route.
   if (!isPublic && !accessToken && !refreshToken) {
-    const loginUrl = new URL("/login", req.url);
-    loginUrl.searchParams.set("next", pathname);
-    const redirectRes = NextResponse.redirect(loginUrl);
+    // Dùng chung loginUrl() với auth-guard (cùng thứ tự/tên tham số); phần
+    // `next` ở đây là pathname do chính proxy đọc từ request, không phải giá
+    // trị người dùng gõ vào query string.
+    const redirectRes = NextResponse.redirect(
+      new URL(loginUrl({ next: pathname, reason: endReason }), req.url),
+    );
     if (shouldClearCookies) {
       redirectRes.cookies.delete(ACCESS_COOKIE);
       redirectRes.cookies.delete(REFRESH_COOKIE);

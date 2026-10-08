@@ -56,8 +56,8 @@ export interface NavGroup {
 // Thứ tự + nhãn + icon giữ đúng base.html. Quyết định đã chốt ở Round 5:
 //   - Mọi mục nhóm staff hiện đủ, link thẳng (chấp nhận 404 tạm thời
 //     tới khi làm đúng nhóm tương ứng ở plan).
-//   - Nhóm "Nhắn tin" ẨN cho tới khi có /messages (Nhóm 4) — khi đó chỉ
-//     cần đổi enabled: true, <UnreadBadge /> đã sẵn sàng.
+//   - Nhóm "Nhắn tin" đã BẬT từ khi xong /messages (Nhóm 4); cờ `enabled`
+//     vẫn giữ trong NavGroup cho nhóm nào cần ẩn tạm về sau.
 export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Việc làm",
@@ -67,7 +67,6 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Nhắn tin",
     audience: "authenticated",
-    enabled: false,
     items: [
       {
         label: "Tin nhắn",

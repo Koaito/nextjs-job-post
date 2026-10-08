@@ -8,11 +8,11 @@
 // QUAN TRỌNG (plan dòng 359, 855): layout này che CẢ route public
 // (/jobs, /jobs/[jobId]) lẫn route cần login (/profile/security,
 // /them-moi...) — nên KHÔNG được gọi requireUser()/requireStaff() ở đây
-// (sẽ chặn nhầm /jobs cho khách chưa đăng nhập). Chỉ ĐỌC getCurrentUser()
+// (sẽ chặn nhầm /jobs cho khách chưa đăng nhập). Chỉ ĐỌC getSessionState()
 // (trả null cho khách) rồi rẽ nhánh UI. Guard thật nằm ở TỪNG route con
 // cần login tự gọi requireUser()/requireStaff().
 //
-// Fetch ngay trong layout (getCurrentUser + danh sách job đã lưu) — an
+// Fetch ngay trong layout (getSessionState + danh sách job đã lưu) — an
 // toàn với Phụ lục A của plan vì cả 2 đều đi qua getValidAccessToken()
 // đã bọc React.cache(): trong 1 lần render chỉ tối đa 1 lần /auth/refresh.
 //
@@ -25,13 +25,14 @@
 
 import { cookies } from "next/headers";
 import { AppSidebar } from "@/components/app-sidebar";
+import { SessionEndListener } from "@/components/session-end-listener";
 import { SavedJobsProvider } from "@/components/saved-jobs-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { listMySavedJobIds } from "@/lib/api/applications";
 import type { SidebarViewer } from "@/lib/nav";
-import { getCurrentUser } from "@/lib/session";
+import { getSessionState } from "@/lib/session";
 
 // Tên cookie shadcn SidebarProvider tự ghi (const nội bộ, không export
 // từ components/ui/sidebar.tsx) — nếu sau này chạy lại `shadcn add
@@ -43,7 +44,7 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [user, cookieStore] = await Promise.all([getCurrentUser(), cookies()]);
+  const [{ user, endReason }, cookieStore] = await Promise.all([getSessionState(), cookies()]);
   const defaultOpen = cookieStore.get(SIDEBAR_COOKIE_NAME)?.value !== "false";
 
   // Chỉ gọi khi đã đăng nhập, và KHÔNG lọc theo !is_staff: _job_card.html
@@ -98,6 +99,11 @@ export default async function AppLayout({
         </SidebarProvider>
       </SavedJobsProvider>
       <Toaster richColors position="top-right" />
+      {/* Phụ lục C: báo phiên kết thúc (đăng nhập nơi khác / bị thu hồi) +
+          đồng bộ giữa các tab. Đặt SAU <Toaster/> có chủ đích: effect của
+          anh em chạy theo thứ tự, Toaster phải đăng ký lắng nghe xong thì
+          toast gọi từ effect của listener mới không bị mất. */}
+      <SessionEndListener reason={endReason} />
     </TooltipProvider>
   );
 }

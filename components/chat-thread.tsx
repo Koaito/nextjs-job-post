@@ -58,13 +58,18 @@ import { ChatMessageList, type PendingChatMessage } from "@/components/chat-mess
 import { NoteConfirmDialog } from "@/components/note-confirm-dialog";
 import { cancelMessageRequestAction, sendMessageAction } from "@/lib/actions/message-actions";
 import type { ChatMessageView } from "@/lib/messages";
+import { endSessionIfNeeded, readErrorCode } from "@/lib/session-end-client";
 
 const BASE_INTERVAL_MS = 5_000; // khớp CHAT_BASE_INTERVAL
 const MAX_INTERVAL_MS = 30_000; // khớp CHAT_MAX_INTERVAL
 const BOTTOM_THRESHOLD_PX = 40; // khớp `scrollHeight - 40` của app.js
 
 class SinceFetchError extends Error {
-  constructor(public readonly status: number) {
+  constructor(
+    public readonly status: number,
+    /** error_code do Route Handler kèm theo (Phụ lục C), nếu có. */
+    public readonly errorCode?: string,
+  ) {
     super(`since request failed: ${status}`);
     this.name = "SinceFetchError";
   }
@@ -79,7 +84,7 @@ async function fetchMessagesSince(partnerId: string, afterId: number): Promise<C
     `/api/messages/since/${encodeURIComponent(partnerId)}?after_id=${afterId}`,
     { cache: "no-store" },
   );
-  if (!res.ok) throw new SinceFetchError(res.status);
+  if (!res.ok) throw new SinceFetchError(res.status, await readErrorCode(res));
   const data: unknown = await res.json();
   return Array.isArray(data) ? (data as ChatMessageView[]) : [];
 }
@@ -171,7 +176,11 @@ export function ChatThread({
         if (addConfirmed(data) && wasAtBottom) stickRef.current = true;
       },
       onError: (err) => {
-        if (isUnauthorized(err)) setStopped(true);
+        if (isUnauthorized(err)) {
+          setStopped(true);
+          // Bị đăng nhập nơi khác / phiên bị thu hồi -> báo + sang /login.
+          endSessionIfNeeded(err.status, err.errorCode);
+        }
       },
       onErrorRetry: (err, _key, _config, revalidate, { retryCount }) => {
         if (isUnauthorized(err)) return; // dừng hẳn

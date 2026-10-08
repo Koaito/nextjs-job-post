@@ -21,13 +21,18 @@
 import { useState } from "react";
 import useSWR from "swr";
 import { SidebarMenuBadge } from "@/components/ui/sidebar";
+import { endSessionIfNeeded, readErrorCode } from "@/lib/session-end-client";
 
 const ENDPOINT = "/api/messages/unread-count";
 const BASE_INTERVAL_MS = 20_000; // khớp BADGE_BASE_INTERVAL
 const MAX_INTERVAL_MS = 45_000; // khớp BADGE_MAX_INTERVAL
 
 class UnreadFetchError extends Error {
-  constructor(public readonly status: number) {
+  constructor(
+    public readonly status: number,
+    /** error_code do Route Handler kèm theo (Phụ lục C), nếu có. */
+    public readonly errorCode?: string,
+  ) {
     super(`unread-count request failed: ${status}`);
     this.name = "UnreadFetchError";
   }
@@ -39,7 +44,7 @@ function isUnauthorized(err: unknown): boolean {
 
 async function fetchUnreadCount(url: string): Promise<{ count: number }> {
   const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new UnreadFetchError(res.status);
+  if (!res.ok) throw new UnreadFetchError(res.status, await readErrorCode(res));
   return res.json();
 }
 
@@ -50,7 +55,11 @@ export function UnreadBadge() {
     refreshInterval: BASE_INTERVAL_MS,
     refreshWhenHidden: false,
     onError: (err) => {
-      if (isUnauthorized(err)) setStopped(true);
+      if (isUnauthorized(err)) {
+        setStopped(true);
+        // Bị đăng nhập nơi khác / phiên bị thu hồi -> báo + sang /login.
+        endSessionIfNeeded(err.status, err.errorCode);
+      }
     },
     onErrorRetry: (err, _key, _config, revalidate, { retryCount }) => {
       if (isUnauthorized(err)) return; // dừng hẳn

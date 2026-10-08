@@ -4,7 +4,8 @@
 // Mọi hàm trong lib/api/*.ts (jobs.ts, companies.ts...) đều gọi qua đây,
 // không tự viết logic refresh riêng ở bất kỳ đâu khác.
 
-import { getValidAccessToken, forceRefreshAccessToken } from "@/lib/session";
+import { getValidAccessToken, forceRefreshWithReason } from "@/lib/session";
+import { sessionEndReasonFromCode } from "@/lib/session-end";
 import { getClientIpHeaders } from "@/lib/client-ip-server";
 
 export class ApiError extends Error {
@@ -150,13 +151,22 @@ export async function callAuthed<T>(
     // này, và retry có thể khiến 1 lỗi tạm thời bị hiểu nhầm thành hết phiên.
     if (!(err instanceof ApiError) || err.status !== 401) throw err;
 
-    const refreshedToken = await forceRefreshAccessToken();
-    if (refreshedToken === null) {
+    const refresh = await forceRefreshWithReason();
+    if (refresh.token === null) {
       // Refresh phản ứng cũng thất bại -> đây là điểm DUY NHẤT lỗi 401
       // gốc được lan tiếp lên cho nơi gọi tự xử lý (redirect /login,
-      // toast theo error_code — xem lib/auth-guard.ts và Phụ lục C).
+      // banner theo error_code — xem lib/auth-guard.ts và Phụ lục C).
+      //
+      // Nếu refresh thất bại vì lý do cần báo người dùng (vd refresh token
+      // đã bị thu hồi do đăng nhập nơi khác — auth_refresh_token_thu_hoi_truoc)
+      // thì ném lỗi MANG error_code của refresh, vì 401 gốc thường chỉ là
+      // token_expired chung chung, không cho nơi gọi biết nguyên nhân thật.
+      if (sessionEndReasonFromCode(refresh.errorCode) !== null) {
+        throw new ApiError(err.message, 401, refresh.errorCode);
+      }
       throw err;
     }
+    const refreshedToken = refresh.token;
 
     // Thử lại đúng 1 lần, không catch tiếp (tránh lặp vô hạn).
     return rawFetch<T>(path, init, refreshedToken);

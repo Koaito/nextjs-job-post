@@ -18,7 +18,9 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { getMe, refresh as refreshApi } from "@/lib/api/auth";
 import type { BackendUser } from "@/lib/api/types-manual";
+import { ApiError } from "@/lib/api/client";
 import { isExpiredSoon } from "@/lib/jwt";
+import { sessionEndReasonFromCode, type SessionEndReason } from "@/lib/session-end";
 import {
   ACCESS_COOKIE,
   REFRESH_COOKIE,
@@ -98,26 +100,62 @@ export const getValidAccessToken = cache(async (): Promise<string | null> => {
  * hướng A đã chốt trong Phụ lục A — không thêm Redis lock.
  */
 export async function forceRefreshAccessToken(): Promise<string | null> {
+  return (await forceRefreshWithReason()).token;
+}
+
+/**
+ * Cùng việc với forceRefreshAccessToken() nhưng khi refresh THẤT BẠI còn
+ * trả kèm `errorCode` của lỗi refresh — để callAuthed() (lib/api/client.ts)
+ * phân biệt được "refresh token đã bị thu hồi vì đăng nhập nơi khác"
+ * (auth_refresh_token_thu_hoi_truoc, Phụ lục C) với hết hạn thường, thay vì
+ * chỉ biết chung chung là refresh hỏng. Vẫn là bản refresh phản ứng DUY NHẤT
+ * — forceRefreshAccessToken() chỉ là vỏ mỏng bọc lại hàm này.
+ */
+export async function forceRefreshWithReason(): Promise<{
+  token: string | null;
+  errorCode?: string;
+}> {
   const { refreshToken } = await getTokens();
-  if (!refreshToken) return null;
+  if (!refreshToken) return { token: null };
 
   try {
     const pair = await refreshApi(refreshToken);
     await setAuthCookies(pair.access_token, pair.refresh_token);
-    return pair.access_token;
-  } catch {
+    return { token: pair.access_token };
+  } catch (err) {
     await clearAuthCookies();
-    return null;
+    return { token: null, errorCode: err instanceof ApiError ? err.errorCode : undefined };
+  }
+}
+
+/**
+ * Trạng thái phiên của request hiện tại: người dùng (nếu còn hợp lệ) và,
+ * khi không còn, LÝ DO nếu là loại cần báo cho người dùng biết (Phụ lục C:
+ * bị đăng nhập nơi khác thay / phiên bị thu hồi do đăng xuất-đổi mật khẩu).
+ * Hết hạn thường hoặc chưa đăng nhập -> endReason = null (im lặng).
+ *
+ * Cố ý KHÔNG bọc React.cache(): sau Server Action có revalidatePath(), phần
+ * render lại nằm cùng request — cache sẽ giữ thông tin người dùng cũ (vd tên
+ * vừa đổi ở /profile không hiện ngay). Số lần gọi /auth/me không đổi so với
+ * trước: layout và requireUser() vẫn mỗi nơi gọi đúng như cũ.
+ */
+export async function getSessionState(): Promise<{
+  user: BackendUser | null;
+  endReason: SessionEndReason | null;
+}> {
+  const accessToken = await getValidAccessToken();
+  if (!accessToken) return { user: null, endReason: null };
+
+  try {
+    return { user: await getMe(accessToken), endReason: null };
+  } catch (err) {
+    return {
+      user: null,
+      endReason: err instanceof ApiError ? sessionEndReasonFromCode(err.errorCode) : null,
+    };
   }
 }
 
 export async function getCurrentUser(): Promise<BackendUser | null> {
-  const accessToken = await getValidAccessToken();
-  if (!accessToken) return null;
-
-  try {
-    return await getMe(accessToken);
-  } catch {
-    return null;
-  }
+  return (await getSessionState()).user;
 }
