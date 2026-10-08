@@ -4,8 +4,8 @@
 // (Messages), LÀM THEO TỪNG PHẦN:
 //   [x] Phần 1/3 — /messages (file này) + /messages/new + accept/decline/
 //                  block/unblock
-//   [ ] Phần 2/3 — /messages/[partnerId] chỉ xem + polling nhận tin
-//   [ ] Phần 3/3 — gửi tin (optimistic) + huỷ request + chặn trong khung chat
+//   [x] Phần 2/3 — /messages/[partnerId] xem + polling nhận tin
+//   [x] Phần 3/3 — gửi tin (optimistic) + huỷ request + chặn trong khung chat
 //
 // requireUser(): mọi role đăng nhập đều vào được (Flask @login_required).
 // 4 nút quản lý quan hệ chỉ render cho staff và server action tự

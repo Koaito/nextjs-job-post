@@ -1,7 +1,7 @@
 "use client";
 // components/conversation-block-button.tsx
-// Nút "Chặn" / "Bỏ chặn" học viên ở mỗi dòng hội thoại của /messages. Nhóm 4,
-// Phần 1/3. Phần 3/3 dùng lại đúng component này ở đầu trang chat.
+// Nút "Chặn" / "Bỏ chặn" học viên ở mỗi dòng hội thoại của /messages (Phần 1/3)
+// và ở đầu trang chat /messages/[partnerId] (Phần 3/3) — cùng 1 component.
 //
 // Chỉ render cho SS/admin VÀ khi đối phương là học viên (trang quyết định,
 // khớp điều kiện `partner_role == 'user'` của messages.html); server action
@@ -21,16 +21,23 @@ import { Button } from "@/components/ui/button";
 import { NoteConfirmDialog } from "@/components/note-confirm-dialog";
 import { blockStudentAction, unblockStudentAction } from "@/lib/actions/message-actions";
 
+/** Lề mặc định cho nút nằm cuối 1 dòng danh sách hội thoại (/messages). */
+const LIST_ROW_SPACING = "mr-3.5";
+
 export function ConversationBlockButton({
   studentId,
   studentName,
   blocked,
   relationshipId,
+  spacingClassName = LIST_ROW_SPACING,
 }: {
   studentId: string;
   studentName: string;
   blocked: boolean;
   relationshipId: string | null;
+  /** Lớp lề ngoài của nút. Mặc định là lề phải của dòng danh sách; ở header
+   *  trang chat truyền "" để không thừa lề. */
+  spacingClassName?: string;
 }) {
   const router = useRouter();
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -57,7 +64,7 @@ export function ConversationBlockButton({
         type="button"
         variant="ghost"
         size="sm"
-        className="mr-3.5 shrink-0"
+        className={`${spacingClassName} shrink-0`}
         disabled={unblocking}
         aria-label={`Bỏ chặn ${studentName}`}
         onClick={handleUnblock}
@@ -73,7 +80,7 @@ export function ConversationBlockButton({
         type="button"
         variant="ghost"
         size="sm"
-        className="mr-3.5 shrink-0 text-destructive hover:text-destructive"
+        className={`${spacingClassName} shrink-0 text-destructive hover:text-destructive`}
         aria-label={`Chặn ${studentName}`}
         onClick={() => setConfirmOpen(true)}
       >

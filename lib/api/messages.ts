@@ -3,8 +3,8 @@
 // / accept|decline|block|unblock / get_message_history / mark_messages_read
 // của backend_auth.py bên Flask. Nhóm 4 (Messages). Phần 1/3: danh sách +
 // quản lý quan hệ. Phần 2/3 (nửa đầu): getConversation, getMessageHistory,
-// markMessagesRead. Nửa sau của phần 2 thêm polling "since"; phần 3/3 thêm
-// gửi tin + huỷ request.
+// markMessagesRead. Phần 2/3 (nửa sau): getMessagesSince (polling). Phần 3/3:
+// sendMessage (gửi tin) + cancelMessageRequest (học viên huỷ request).
 //
 // Mọi hàm đi qua callAuthed() (JWT bắt buộc, mặc định no-store). Rate limit
 // backend NHỎ so với các route khác: GET /conversations và /pending-requests
@@ -27,14 +27,25 @@ export const MESSAGE_HISTORY_PAGE_SIZE = 50;
 /** error_code backend gắn cho 404 của GET /messages/conversations/{id}. */
 export const PARTNER_NOT_FOUND_CODE = "message_partner_not_found";
 
+/** error_code của 429 RIÊNG khi học viên có quá nhiều request đang chờ (khác
+ *  429 rate limit chung, vốn không có error_code). */
+export const TOO_MANY_PENDING_CODE = "message_too_many_pending_requests";
+
 /** Backend ràng buộc q: 1..100 ký tự (Query min_length=1, max_length=100). */
 export const SEARCH_PEOPLE_MAX_LENGTH = 100;
 
-/** Message lỗi hiển thị cho người dùng; 429 có câu riêng, còn lại dùng
- *  message backend (đã là tiếng Việt) hoặc `fallback`. */
+/** Message lỗi hiển thị cho người dùng; 429 rate limit chung có câu riêng, còn
+ *  lại dùng message backend (đã là tiếng Việt) hoặc `fallback`.
+ *
+ *  429 CÓ error_code (MESSAGE_TOO_MANY_PENDING_REQUESTS — học viên có quá nhiều
+ *  request đang chờ) KHÔNG phải rate limit: message backend nêu rõ giới hạn và
+ *  việc cần làm, plan Nhóm 4 yêu cầu hiện nguyên văn thay vì câu "thao tác quá
+ *  nhanh" gây hiểu nhầm. Chỉ 429 KHÔNG có error_code mới là rate limit. */
 export function describeMessagesError(err: unknown, fallback: string): string {
   if (err instanceof ApiError) {
-    if (err.status === 429) return "Bạn thao tác quá nhanh, vui lòng thử lại sau ít giây.";
+    if (err.status === 429 && !err.errorCode) {
+      return "Bạn thao tác quá nhanh, vui lòng thử lại sau ít giây.";
+    }
     // "Lỗi không xác định" là message mặc định của lỗi hạ tầng (Dạng 3 ở
     // client.ts) — không có thông tin gì, dùng fallback cụ thể của nơi gọi.
     if (err.message && err.message !== "Lỗi không xác định") return err.message;
@@ -144,6 +155,84 @@ export async function getMessageHistory(
  *  trang chat). */
 export async function markMessagesRead(partnerId: string): Promise<void> {
   await callAuthed<unknown>(`/messages/read/${encodeURIComponent(partnerId)}`, {
+    method: "POST",
+  });
+}
+
+/**
+ * GET /messages/since/{partner_id}?after_id= — chỉ tin có id > after_id, backend
+ * trả CŨ -> MỚI (ORDER BY id ASC). Vẫn sắp lại theo id cho chắc, giống
+ * getMessageHistory(). Gọi từ Route Handler polling (app/api/messages/since),
+ * không gọi trực tiếp từ component.
+ */
+export async function getMessagesSince(
+  partnerId: string,
+  afterId: number,
+): Promise<ChatMessageOut[]> {
+  const params = new URLSearchParams({ after_id: String(afterId) });
+  const rows =
+    (await callAuthed<ChatMessageOut[]>(
+      `/messages/since/${encodeURIComponent(partnerId)}?${params}`,
+    )) ?? [];
+  return [...rows].sort((a, b) => a.id - b.id);
+}
+
+/** Kết quả POST /messages — 2 shape khác nhau cho cùng 1 route. */
+export type SendMessageResult =
+  | { kind: "message"; message: ChatMessageOut }
+  | { kind: "pending_request"; notice: string };
+
+/**
+ * POST /messages — gửi tin. receiver_id + content; sender_id backend tự lấy từ
+ * JWT. 2 shape response:
+ *   - 201 ChatMessageOut          -> tin đã lưu thật   (kind "message")
+ *   - 202 {status:"pending",...}  -> học viên vừa TẠO/GỬI LẠI request, CHƯA có
+ *                                    tin nào được lưu   (kind "pending_request")
+ *
+ * LỆCH SO VỚI PLAN (đã báo trong ghi chú giao việc): plan bảo phân biệt bằng
+ * HTTP status, nhưng callAuthed() chỉ trả body JSON, không lộ status, và plan
+ * cấm viết lại logic refresh ngoài callAuthed. Thay vào đó dùng field `kind`
+ * mà backend đã thêm đúng cho mục đích này (plan 3.15; xác nhận trong
+ * api/routers/messages.py: cả 201 lẫn 202 đều mang `kind`). Vẫn rẽ nhánh theo
+ * `kind` tường minh, KHÔNG đoán theo "có field id hay không" khi `kind` có mặt;
+ * chỉ khi `kind` vắng (backend cũ) mới dựa vào dạng body, và body không khớp
+ * dạng nào thì ném lỗi chứ không đoán bừa — nhầm 202 thành tin đã gửi sẽ khiến
+ * học viên tin rằng SS đã nhận được tin.
+ */
+export async function sendMessage(receiverId: string, content: string): Promise<SendMessageResult> {
+  const body = await callAuthed<Record<string, unknown> | null>("/messages", {
+    method: "POST",
+    body: JSON.stringify({ receiver_id: receiverId, content }),
+  });
+
+  const kind = body?.kind;
+  const isPending =
+    kind === "pending_request" || (kind === undefined && body?.status === "pending");
+  if (isPending) {
+    const notice = typeof body?.message === "string" && body.message ? body.message : "";
+    return {
+      kind: "pending_request",
+      notice: notice || "Đã gửi yêu cầu nhắn tin — chờ SS chấp nhận trước khi có thể nhắn tiếp.",
+    };
+  }
+
+  const isMessage =
+    kind === "message" ||
+    (kind === undefined && typeof body?.id === "number" && typeof body?.content === "string");
+  if (isMessage) return { kind: "message", message: body as unknown as ChatMessageOut };
+
+  console.error("[api] POST /messages: phản hồi không khớp dạng nào đã biết", body);
+  throw new ApiError("Phản hồi gửi tin nhắn không hợp lệ.");
+}
+
+/**
+ * POST /messages/cancel/{ss_id} — học viên TỰ HUỶ request đang pending do chính
+ * mình tạo. Backend xoá hẳn dòng quan hệ (không cooldown), nên body trả về chỉ
+ * để hiện thông báo, không dùng để tra cứu lại. 404 = không có request pending
+ * để huỷ; 409 = SS vừa kịp xử lý.
+ */
+export async function cancelMessageRequest(ssId: string): Promise<RelationshipOut> {
+  return callAuthed<RelationshipOut>(`/messages/cancel/${encodeURIComponent(ssId)}`, {
     method: "POST",
   });
 }

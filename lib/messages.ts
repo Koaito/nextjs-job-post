@@ -1,6 +1,13 @@
 // lib/messages.ts
 // Helper thuần (không đụng server/API) dùng chung cho các trang Messages.
-// Nhóm 4 — Messages, Phần 1/3.
+// Nhóm 4 — Messages, Phần 1/3 + Phần 2/3 (nửa sau) + Phần 3/3.
+//
+// Chỉ `import type` từ lib/api/messages (bị xoá lúc biên dịch) nên file này
+// vẫn import được an toàn từ Client Component, không kéo theo callAuthed/
+// next/headers vào bundle trình duyệt.
+
+import { formatMessageTimeVN } from "@/lib/date";
+import type { ChatMessageOut } from "@/lib/api/messages";
 
 /**
  * Link tới khung chat của 1 người, mang sẵn ?name=&role= — plan Nhóm 4:
@@ -53,3 +60,48 @@ export function firstParam(value: string | string[] | undefined): string {
  *  cho tới 255, nhưng đây chỉ là gợi ý dự phòng — không để URL tự đặt 1
  *  chuỗi dài làm vỡ tiêu đề). */
 export const PARTNER_NAME_FROM_URL_MAX = 100;
+
+/** Dạng gọn của 1 tin — chỉ các field cần hiển thị, để KHÔNG đẩy cả
+ *  ChatMessageOut (read_at, receiver_id...) xuống trình duyệt. Dùng chung cho
+ *  tin tải lúc mở trang (page.tsx), tin polling (Route Handler since) và tin
+ *  vừa gửi (server action) — cả 3 nơi đều đi qua toChatMessageView() nên
+ *  luôn cùng 1 dạng + cùng 1 cách định dạng giờ. */
+export interface ChatMessageView {
+  id: number;
+  senderId: string;
+  content: string;
+  /** Đã định dạng sẵn ở server theo giờ VN (tránh lệch múi giờ + hydration). */
+  timeLabel: string;
+}
+
+export function toChatMessageView(m: ChatMessageOut): ChatMessageView {
+  return {
+    id: m.id,
+    senderId: m.sender_id,
+    content: m.content,
+    timeLabel: formatMessageTimeVN(m.created_at),
+  };
+}
+
+/** Giới hạn độ dài 1 tin — khớp CHECK char_length(btrim(content)) BETWEEN 1
+ *  AND 2000 ở backend và MAX_CONTENT_LENGTH của Flask. */
+export const MESSAGE_MAX_LENGTH = 2000;
+
+/** Đếm theo KÝ TỰ (code point) như len() của Python/Pydantic ở backend, không
+ *  phải đơn vị UTF-16 của String.length — 1 emoji là 1 ký tự ở backend nhưng
+ *  .length của JS tính 2, đếm sai sẽ chặn oan tin còn nằm trong giới hạn. */
+export function countMessageChars(text: string): number {
+  return Array.from(text).length;
+}
+
+/** Kiểm tra nội dung tin TRƯỚC khi gọi backend (double-check như Flask, backend
+ *  mới là lớp chặn thật). Trả câu lỗi tiếng Việt, hoặc null nếu hợp lệ. Dùng
+ *  chung cho ô nhập (client) và server action để 2 nơi không lệch nhau. */
+export function validateMessageContent(content: string): string | null {
+  const trimmed = content.trim();
+  if (!trimmed) return "Vui lòng nhập nội dung tin nhắn.";
+  if (countMessageChars(trimmed) > MESSAGE_MAX_LENGTH) {
+    return `Tin nhắn không được vượt quá ${MESSAGE_MAX_LENGTH} ký tự.`;
+  }
+  return null;
+}

@@ -1,10 +1,14 @@
 // app/(app)/messages/[partnerId]/page.tsx
 // Tương đương messages_thread.html + blueprints/messages.py::thread() (Flask)
-// — khung chat 1-1. Nhóm 4 (Messages), Phần 2/3, NỬA ĐẦU (xem, chưa polling):
+// — khung chat 1-1. Nhóm 4 (Messages):
 //   [x] 2/3 nửa đầu — file này: tải lịch sử, tên/role người đối thoại, chặn
 //                     tự chat, đánh dấu đã đọc, cuộn xuống cuối lúc mở
-//   [ ] 2/3 nửa sau — Route Handler since + SWR polling + wasAtBottom
-//   [ ] 3/3         — ô gửi tin (optimistic), huỷ request, nút Chặn/Bỏ chặn
+//   [x] 2/3 nửa sau — Route Handler since + SWR polling + wasAtBottom
+//                     (components/chat-thread.tsx)
+//   [x] 3/3         — ô gửi tin (optimistic), huỷ request, nút Chặn/Bỏ chặn
+//
+// Phần tương tác (state tin, polling, gửi, huỷ) nằm hết trong <ChatThread>;
+// file này chỉ tải dữ liệu ban đầu ở server rồi truyền xuống.
 //
 // CÁC CHỖ DỄ SAI (đều có kiểm tra):
 //   - Backend trả MỚI NHẤT TRƯỚC; getMessageHistory() đã sắp lại cũ -> mới.
@@ -18,8 +22,11 @@
 //     khi tải lỗi -> tin chưa từng được nhìn thấy vẫn bị đánh "đã đọc").
 //     Chạy SAU khi có lịch sử (không song song) để tin đến giữa chừng không bị
 //     đánh dấu đã đọc mà chưa hiện; lỗi bước này bị nuốt (plan).
-//   - key={partnerId} ở ChatMessageList: đi từ thread A sang thread B giữ
-//     nguyên instance component -> không có key thì state cũ (tin của A) còn lại.
+//   - key={partnerId} ở ChatThread: đi từ thread A sang thread B giữ nguyên
+//     instance component -> không có key thì state cũ (tin của A) còn lại.
+//   - Người xem là staff: LUÔN dùng relationship_status/_id từ getConversation()
+//     (plan Nhóm 4 — không bỏ bước này dù đã có name/role trên URL) để hiện
+//     đúng nút Chặn/Bỏ chặn; cặp chưa có quan hệ thì 2 field này null.
 //
 // requireUser(): mọi role đăng nhập đều vào được (Flask @login_required).
 // force-dynamic: nội dung đổi từng giây, không được cache.
@@ -35,10 +42,17 @@ import {
   markMessagesRead,
   type ChatMessageOut,
 } from "@/lib/api/messages";
-import { ChatMessageList, type ChatMessageView } from "@/components/chat-message-list";
+import { ChatThread } from "@/components/chat-thread";
+import { ConversationBlockButton } from "@/components/conversation-block-button";
 import { ROLE_LABELS } from "@/lib/constants";
-import { formatMessageTimeVN } from "@/lib/date";
-import { PARTNER_NAME_FROM_URL_MAX, firstParam, isSameUserId, isUuid } from "@/lib/messages";
+import {
+  PARTNER_NAME_FROM_URL_MAX,
+  firstParam,
+  isSameUserId,
+  isUuid,
+  toChatMessageView,
+  type ChatMessageView,
+} from "@/lib/messages";
 
 export const dynamic = "force-dynamic";
 
@@ -96,12 +110,26 @@ export default async function MessageThreadPage({
     historyError = describeMessagesError(historyRes.reason, "Không tải được lịch sử tin nhắn.");
   }
 
-  const initialMessages: ChatMessageView[] = messages.map((m) => ({
-    id: m.id,
-    senderId: m.sender_id,
-    content: m.content,
-    timeLabel: formatMessageTimeVN(m.created_at),
-  }));
+  const initialMessages: ChatMessageView[] = messages.map(toChatMessageView);
+
+  // Quan hệ nhắn tin (chỉ có khi `partner` tải được; null = chưa có quan hệ
+  // hoặc cặp SS-SS không qua state machine).
+  const relationshipStatus = partner?.relationship_status ?? null;
+  const relationshipId = partner?.relationship_id ?? null;
+
+  // Nút Chặn/Bỏ chặn: chỉ staff, và chỉ khi đối phương là học viên (khớp
+  // `current_user.is_staff and partner_role == 'user'` của messages_thread.html).
+  const showBlockButton = user.is_staff && partnerRole === "user";
+
+  // Có được hiện tin tạm (optimistic) trước khi backend phản hồi không? Chỉ khi
+  // lần gửi này chắc chắn tạo TIN THẬT: staff gửi được trừ khi đang chặn người
+  // đó; học viên chỉ khi quan hệ đã accepted — các trạng thái khác (chưa có
+  // quan hệ, declined) sẽ tạo REQUEST chờ duyệt (202, không lưu tin nào), hiện
+  // bong bóng rồi gỡ đi sẽ trông như tin biến mất. Trạng thái có thể đã cũ nên
+  // đây chỉ là gợi ý UI; sai thì tin tạm bị gỡ + hiện lỗi, không hỏng dữ liệu.
+  const optimisticSend = user.is_staff
+    ? relationshipStatus !== "blocked"
+    : relationshipStatus === "accepted";
 
   // Câu trạng thái rỗng khớp messages_thread.html. Lúc tải lịch sử lỗi KHÔNG
   // hiện (null) — "chưa có tin nhắn" lúc đó là thông tin sai.
@@ -128,8 +156,15 @@ export default async function MessageThreadPage({
             )}
           </h1>
         </div>
-        {/* Phần 3/3: nút Chặn/Bỏ chặn học viên (cần relationship_status/_id
-            từ `partner`, đã tải sẵn ở trên). */}
+        {showBlockButton && (
+          <ConversationBlockButton
+            studentId={partnerId}
+            studentName={partnerName}
+            blocked={relationshipStatus === "blocked"}
+            relationshipId={relationshipId}
+            spacingClassName=""
+          />
+        )}
       </header>
 
       {historyError && (
@@ -139,12 +174,16 @@ export default async function MessageThreadPage({
       )}
 
       <div className="overflow-hidden rounded-[var(--radius)] border border-border bg-card">
-        <ChatMessageList
+        <ChatThread
           key={partnerId}
-          initialMessages={initialMessages}
-          viewerId={user.ss_user_id}
+          partnerId={partnerId}
           partnerName={partnerName}
+          partnerRole={partnerRole}
+          viewerId={user.ss_user_id}
+          viewerIsStudent={!user.is_staff}
+          initialMessages={initialMessages}
           emptyText={emptyText}
+          optimisticSend={optimisticSend}
         />
       </div>
     </div>
