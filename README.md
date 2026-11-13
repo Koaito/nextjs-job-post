@@ -34,3 +34,19 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Type API (OpenAPI)
+
+`lib/api/types.ts` được **sinh tự động**, không sửa tay. Nguồn là `openapi/openapi.snapshot.json`, bản copy của
+`openapi.snapshot.json` ở repo backend (Scrap JD), nơi có test giữ cho nó khớp API.
+
+Khi backend đổi API (đã commit snapshot mới ở backend):
+
+```bash
+npm run sync:openapi -- "đường/dẫn/tới/Scrap JD"   # copy snapshot + sinh lại types.ts
+npm run typecheck && npm test                     # xem code nào lệch kiểu
+```
+
+Rồi commit cả `openapi/openapi.snapshot.json` và `lib/api/types.ts`. Chỉ sinh lại types từ bản copy hiện có:
+`npm run gen:types`. CI chạy `gen:types` rồi so với bản đã commit, nên sửa tay `types.ts` hoặc đổi snapshot mà quên
+sinh lại sẽ làm CI đỏ. CI **không** tự biết backend đã đổi: bước đồng bộ ở trên vẫn là việc chạy tay.

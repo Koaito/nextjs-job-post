@@ -36,6 +36,17 @@ jobs:
       - name: Cài phụ thuộc
         run: npm ci
 
+      # lib/api/types.ts được SINH từ openapi/openapi.snapshot.json (bản copy snapshot của backend, cập nhật bằng
+      # `npm run sync:openapi`). Sinh lại rồi so với bản đã commit: ai sửa tay types.ts, hoặc đổi snapshot mà quên
+      # sinh lại, thì job đỏ ở đây thay vì lỗi kiểu khó hiểu ở bước sau. Đặt TRƯỚC typecheck vì lý do đó.
+      - name: Kiểm tra types.ts khớp snapshot OpenAPI
+        run: |
+          npm run gen:types
+          if ! git diff --exit-code -- lib/api/types.ts; then
+            echo "::error file=lib/api/types.ts::types.ts không khớp openapi/openapi.snapshot.json (xem diff ở trên). Chạy npm run gen:types rồi commit lại, và không sửa tay file này."
+            exit 1
+          fi
+
       - name: Typecheck
         run: npm run typecheck
 

@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "gen:types": "openapi-typescript http://localhost:8000/openapi.json -o lib/api/types.ts",
+    "gen:types": "openapi-typescript openapi/openapi.snapshot.json -o lib/api/types.ts",
+    "sync:openapi": "node scripts/sync-openapi.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"

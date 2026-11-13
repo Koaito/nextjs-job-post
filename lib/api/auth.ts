@@ -5,10 +5,22 @@
 // chúng là nơi LẤY token, không phải nơi CẦN token có sẵn) — 2 hàm này
 // dùng thẳng fetch để tránh vòng lặp phụ thuộc với lib/session.ts.
 
-import type { BackendUser, TokenPair } from "@/lib/api/types-manual";
 import { ApiError, callAuthed } from "@/lib/api/client";
 import type { components } from "@/lib/api/types";
 import { getClientIpHeaders } from "@/lib/client-ip-server";
+
+/**
+ * UserOut (sinh từ OpenAPI) + `is_staff` (role !== "user"). Backend KHÔNG trả `is_staff`, nên chỉ getMe() mới có
+ * giá trị này (tự tính khi map response); mọi nơi khác trong app dựa vào cờ đó, không tự suy lại từ role.
+ * Hàm khác trả thẳng response của backend thì dùng UserOut/StaffUser, không phải BackendUser.
+ */
+export type BackendUser = components["schemas"]["UserOut"] & { is_staff: boolean };
+
+/** Response của POST /auth/login (TokenPairOut, có must_change_password). */
+export type TokenPair = components["schemas"]["TokenPairOut"];
+
+/** Response của POST /auth/refresh (AccessTokenOut): KHÔNG có must_change_password như TokenPairOut. */
+export type RefreshResult = components["schemas"]["AccessTokenOut"];
 
 const BASE_URL = process.env.CRAWLER_API_URL;
 const API_KEY = process.env.CRAWLER_API_KEY;
@@ -61,20 +73,20 @@ export const login = (email: string, password: string) =>
  * — getValidAccessToken() đã bọc React.cache() để đảm bảo điều này).
  */
 export const refresh = (refreshToken: string) =>
-  authRawFetch<TokenPair>("/auth/refresh", {
+  authRawFetch<RefreshResult>("/auth/refresh", {
     method: "POST",
     body: JSON.stringify({ refresh_token: refreshToken }),
   });
 
 /**
  * GET /auth/me — backend trả UserOut (KHÔNG có field `is_staff`, xem
- * lib/api/types-manual.ts), nên tự tính thêm ở đây trước khi trả ra
+ * BackendUser ở đầu file), nên tự tính thêm ở đây trước khi trả ra
  * ngoài. Mọi nơi khác trong app (session.ts, auth-guard.ts, route
  * handlers...) dựa vào is_staff đã tính sẵn này, không tự suy lại
  * `role !== "user"` rải rác nhiều chỗ.
  */
 export const getMe = async (accessToken: string): Promise<BackendUser> => {
-  const user = await authRawFetch<Omit<BackendUser, "is_staff">>("/auth/me", {
+  const user = await authRawFetch<components["schemas"]["UserOut"]>("/auth/me", {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   return { ...user, is_staff: user.role !== "user" };
@@ -88,7 +100,7 @@ export const getMe = async (accessToken: string): Promise<BackendUser> => {
  * (Phần 2 mục 3 của plan)
  */
 export const updateMe = (data: { full_name: string; phone?: string; track?: string }) =>
-  callAuthed<BackendUser>("/auth/me", {
+  callAuthed<components["schemas"]["UserOut"]>("/auth/me", {
     method: "PATCH",
     body: JSON.stringify(data),
   });
@@ -108,7 +120,7 @@ export const logout = () => callAuthed<void>("/auth/logout", { method: "POST" })
  * hiện phiên đã chết.
  */
 export const changePassword = (data: { old_password?: string; new_password: string }) =>
-  callAuthed<BackendUser>("/auth/change-password", {
+  callAuthed<components["schemas"]["UserOut"]>("/auth/change-password", {
     method: "POST",
     body: JSON.stringify(data),
   });

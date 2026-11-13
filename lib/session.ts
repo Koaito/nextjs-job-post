@@ -16,8 +16,7 @@
 
 import { cache } from "react";
 import { cookies } from "next/headers";
-import { getMe, refresh as refreshApi } from "@/lib/api/auth";
-import type { BackendUser } from "@/lib/api/types-manual";
+import { getMe, refresh as refreshApi, type BackendUser } from "@/lib/api/auth";
 import { ApiError } from "@/lib/api/client";
 import { isExpiredSoon } from "@/lib/jwt";
 import { sessionEndReasonFromCode, type SessionEndReason } from "@/lib/session-end";

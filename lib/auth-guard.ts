@@ -7,7 +7,7 @@ import { redirect, notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { getSessionState } from "@/lib/session";
 import { loginUrl } from "@/lib/session-end";
-import type { BackendUser } from "@/lib/api/types-manual";
+import type { BackendUser } from "@/lib/api/auth";
 
 /**
  * Chỉ chấp nhận path NỘI BỘ: bắt đầu bằng "/" và KHÔNG bắt đầu bằng "//"

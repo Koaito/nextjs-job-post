@@ -1,1 +1,4 @@
 * text=auto eol=lf
+# File sinh tự động: gộp gọn khi xem diff trên GitHub.
+openapi/openapi.snapshot.json linguist-generated=true
+lib/api/types.ts linguist-generated=true

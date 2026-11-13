@@ -48,8 +48,13 @@ export interface paths {
          *     route tự map sang level_id/province_id qua các hàm db.* đã có.
          *
          *     IDEMPOTENT: gọi lại nhiều lần với data y hệt (company_id + job_title
-         *     + level_code + province_name giống nhau) sẽ KHÔNG tạo job trùng —
-         *     trả về đúng job đã có (xem db.create_manual_job()).
+         *     + province_name + level_code giống nhau) sẽ KHÔNG tạo job trùng —
+         *     trả về đúng job đã có (xem db.create_manual_job()), để nhân viên vào
+         *     sửa job đó thay vì tạo thêm.
+         *
+         *     Cùng công ty + tên job + tỉnh nhưng KHÁC level: vẫn tạo job mới (level
+         *     do nhân viên chọn nên đáng tin hơn level máy suy ra bên crawl), kèm
+         *     `similar_jobs` liệt kê các job đang mở giống đó để client cảnh báo.
          *
          *     Response kèm `was_existing` (cùng dạng POST /companies): true = job trả
          *     về là job CŨ, mọi dữ liệu vừa gửi (lương, deadline, mô tả...) bị bỏ,
@@ -61,7 +66,7 @@ export interface paths {
          *     sql/migration_add_role_hierarchy.sql) — để ghi lại
          *     job_postings.created_by (audit trail "ai tạo job này"), đồng thời
          *     chặn role 'user' (chỉ xem) không sửa được dữ liệu. Vẫn cần header
-         *     X-API-Key NHƯ CŨ (2 lớp xếp chồng, xem docstring api/deps.py), CỘNG
+         *     X-API-Key NHƯ CŨ (2 lớp xếp chồng, xem docstring scrapjd/api/deps.py), CỘNG
          *     THÊM header Authorization: Bearer <access_token> lấy từ POST
          *     /auth/login.
          */
@@ -294,7 +299,7 @@ export interface paths {
         /**
          * List Companies
          * @description Rate limit 60/minute theo IP (thêm 08/2026) — cùng lý do với
-         *     GET /jobs (xem api/routers/jobs.py::list_jobs).
+         *     GET /jobs (xem scrapjd/api/routers/jobs.py::list_jobs).
          */
         get: operations["list_companies_companies_get"];
         put?: never;
@@ -619,7 +624,7 @@ export interface paths {
          *     trước; bỏ trống cả 2 -> dùng DEFAULT_MAX_PAGES như trước giờ.
          *
          *     BẮT BUỘC đăng nhập VÀ role='admin' (Depends(require_admin), nay là
-         *     alias của require_role("admin") — xem api/deps.py) — chặt hơn POST
+         *     alias của require_role("admin") — xem scrapjd/api/deps.py) — chặt hơn POST
          *     /jobs, POST /companies (chỉ cần role 'ss_team' trở lên), vì kích
          *     hoạt crawl tốn tài nguyên server thật (network + CPU parse trong vài
          *     phút) nên hạn chế ai cũng bấm được, tránh spam nhiều lượt crawl chạy
@@ -672,7 +677,7 @@ export interface paths {
          *     Chỉ tạo + kích hoạt CATEGORY ĐẦU TIÊN ngay trong request này (giống
          *     hệt POST /crawl đơn lẻ) — các category còn lại tự động được tạo +
          *     chạy nối tiếp bởi CHÍNH background task đó (xem
-         *     api/crawl_runner.py::execute()), KHÔNG cần request/background task
+         *     scrapjd/api/crawl_runner.py::execute()), KHÔNG cần request/background task
          *     nào khác cho các category sau.
          *
          *     CÙNG mức quyền 'admin' như POST /crawl đơn lẻ (kích hoạt crawl tốn
@@ -812,7 +817,7 @@ export interface paths {
          * Trigger Maintenance Run
          * @description Kích hoạt 1 lượt chạy job bảo trì dữ liệu CHẠY NỀN — trả về
          *     run_id ngay, KHÔNG chờ chạy xong (đối xứng POST /crawl, xem docstring
-         *     api/maintenance_runner.py).
+         *     scrapjd/api/maintenance_runner.py).
          *
          *     BẮT BUỘC đăng nhập VÀ role='admin' — cùng mức chặt như POST /crawl
          *     (5 job này đều ghi/gọi API tốn tài nguyên, 2 job còn tốn PHÍ THẬT
@@ -971,7 +976,7 @@ export interface paths {
          * @description Số liệu tổng quan cho dashboard — tổng job, tổng công ty, tỷ lệ
          *     đã có social, phân bố theo ngành/nguồn, tổng đơn ứng tuyển (thêm
          *     08/2026), jobs_by_status và total_students (thêm 09/2026 — xem
-         *     StatsOut ở api/schemas/stats.py).
+         *     StatsOut ở scrapjd/api/schemas/stats.py).
          */
         get: operations["get_stats_stats_get"];
         put?: never;
@@ -1027,12 +1032,12 @@ export interface paths {
          * Get Sources
          * @description Danh sách source + category có sẵn để crawl — frontend dùng để
          *     render dropdown cho form POST /crawl, không cần hard-code lại phía
-         *     frontend, luôn khớp với sources_registry.py hiện hành.
+         *     frontend, luôn khớp với scrapjd/sources_registry.py hiện hành.
          *
-         *     08/2026 — VIẾT LẠI để lặp qua CATEGORIES_BY_SOURCE (sources_registry.py)
+         *     08/2026 — VIẾT LẠI để lặp qua CATEGORIES_BY_SOURCE (scrapjd/sources_registry.py)
          *     thay vì liệt kê thủ công từng nguồn (topcv/vietnamworks/careerviet).
          *     Bản cũ từng "quên" thêm careerviet ở đúng chỗ này dù backend đã
-         *     crawl được qua CLI (xem docstring sources_registry.py) — với vòng
+         *     crawl được qua CLI (xem docstring scrapjd/sources_registry.py) — với vòng
          *     lặp này, thêm 1 nguồn mới vào registry là endpoint tự động trả về
          *     đúng, không còn khả năng quên hardcode ở đây nữa.
          */
@@ -1074,7 +1079,7 @@ export interface paths {
          *     route này không đọc DB (xem test_get_enums_has_no_parameters), và
          *     bảng thật có thể còn dòng tên tỉnh CŨ chỉ để giữ tham chiếu dữ liệu
          *     lịch sử — không được cho chọn lại. Danh sách này được test tự động
-         *     so khớp với sql/schema.sql + migration + province_alias.py.
+         *     so khớp với sql/schema.sql + migration + scrapjd/province_alias.py.
          */
         get: operations["get_enums_enums_get"];
         put?: never;
@@ -1097,7 +1102,7 @@ export interface paths {
         /**
          * Login
          * @description 20/minute theo IP — thêm 08/2026 cùng đợt rà soát rate-limit tổng
-         *     thể (xem api/rate_limit.py). Route công khai duy nhất KHÔNG có giới
+         *     thể (xem scrapjd/api/rate_limit.py). Route công khai duy nhất KHÔNG có giới
          *     hạn nào trước đó ngoài khoá tài khoản is_account_locked() — nhưng
          *     khoá đó chỉ chặn brute-force VÀO 1 tài khoản cụ thể (5 lần sai liên
          *     tiếp, xem security.FAILED_LOGIN_LOCK_THRESHOLD), không chặn được kiểu
@@ -2155,7 +2160,7 @@ export interface paths {
         /**
          * Register
          * @description Tự đăng ký — luôn tạo role='user' (thấp nhất, xem
-         *     api.deps.ROLE_HIERARCHY), KHÔNG cho tự chọn role qua request (khác
+         *     scrapjd.api.deps.ROLE_HIERARCHY), KHÔNG cho tự chọn role qua request (khác
          *     POST /auth/users admin-only có thể chọn role). Muốn lên 'ss_team'
          *     phải nhờ admin nâng cấp qua PATCH /auth/users/{id}/role SAU KHI đã
          *     đăng ký + xác thực email (đúng luồng đã thống nhất — xem lịch sử
@@ -2166,7 +2171,7 @@ export interface paths {
          *     Nếu gửi email lỗi (Resend down/rate-limit...), tài khoản VẪN đã tạo
          *     thành công — người dùng tự gọi POST /auth/resend-verification sau,
          *     KHÔNG mất dữ liệu đã nhập, không cần đăng ký lại (xem
-         *     api/email_service.py để hiểu lý do không raise khi gửi lỗi).
+         *     scrapjd/api/email_service.py để hiểu lý do không raise khi gửi lỗi).
          */
         post: operations["register_auth_register_post"];
         delete?: never;
@@ -2185,10 +2190,10 @@ export interface paths {
         /**
          * Verify Email
          * @description Endpoint người dùng BẤM TỪ EMAIL (không phải gọi qua code/frontend
-         *     — xem api/email_service.py dựng link này). Route này KHÔNG tự vẽ
+         *     — xem scrapjd/api/email_service.py dựng link này). Route này KHÔNG tự vẽ
          *     giao diện — chỉ xử lý token rồi redirect(302) NGAY về trang
          *     /verify-email của FRONTEND (mindx-jobs, xem FRONTEND_BASE_URL trong
-         *     api/email_service.py — dùng chung biến với link reset mật khẩu) kèm
+         *     scrapjd/api/email_service.py — dùng chung biến với link reset mật khẩu) kèm
          *     ?status=success|expired|invalid, để frontend tự hiển thị đúng theme
          *     của site (trước đây trả HTML tĩnh viết tay ở chính route này — bỏ
          *     từ lúc frontend đã có trang riêng, xem lịch sử trao đổi 08/2026).
@@ -2338,7 +2343,7 @@ export interface components {
          *     lúc tạo (chặn cứng, xem ACTION_LOG_RULES trong db.py) nên route này
          *     vẫn CHO sửa lại (chỉnh câu chữ), nhưng KHÔNG cho set về rỗng nếu
          *     note_required=true (route trả 422 nếu cố tình xoá note của log bắt
-         *     buộc — xem api/routers/audit_logs.py).
+         *     buộc — xem scrapjd/api/routers/audit_logs.py).
          *
          *     Chỉ actor_id GỐC của log mới gọi được route này — kiểm tra ở router,
          *     không ở schema.
@@ -2574,7 +2579,7 @@ export interface components {
         /**
          * CompanyContactWithCompanyOut
          * @description Giống CompanyContactOut, thêm company_name — dùng cho GET /contacts
-         *     (danh sách gộp mọi công ty, xem api/routers/contacts.py::list_all_contacts),
+         *     (danh sách gộp mọi công ty, xem scrapjd/api/routers/contacts.py::list_all_contacts),
          *     vì CompanyContactOut không có tên công ty (route cũ GET
          *     /companies/{company_id}/contacts đã biết company_id sẵn từ path nên
          *     không cần).
@@ -2960,7 +2965,7 @@ export interface components {
         /**
          * ContactAssignUpdate
          * @description Route riêng PATCH /contacts/{contact_id}/assign (xem
-         *     api/routers/contacts.py::assign_contact) — KHÔNG dùng chung
+         *     scrapjd/api/routers/contacts.py::assign_contact) — KHÔNG dùng chung
          *     CompanyContactUpdate ở trên vì pattern "field != None mới ghi đè"
          *     của route update thường không phân biệt được "không gửi field" với
          *     "cố ý set về NULL để bỏ gán". Ở đây assigned_ss_user LUÔN bắt buộc
@@ -3212,7 +3217,7 @@ export interface components {
         /**
          * EmailTemplateCreate
          * @description Tạo mẫu mới — note KHÔNG bắt buộc (giống CREATE_CONTACT/CREATE_JOB),
-         *     xem ACTION_LOG_RULES trong db/audit_logs.py.
+         *     xem ACTION_LOG_RULES trong scrapjd/db/audit_logs.py.
          */
         EmailTemplateCreate: {
             /** Title */
@@ -3745,9 +3750,14 @@ export interface components {
             ss_team_notes?: string | null;
             /**
              * Was Existing
-             * @description true = job trả về đã tồn tại từ trước (trùng công ty + tên job + level + tỉnh), request này KHÔNG tạo bản ghi mới và MỌI dữ liệu vừa gửi (lương, deadline, mô tả...) đều bị bỏ qua, không ghi đè lên job cũ. false = job vừa được tạo mới thật sự.
+             * @description true = job trả về đã tồn tại từ trước (trùng công ty + tên job + tỉnh + level), request này KHÔNG tạo bản ghi mới và MỌI dữ liệu vừa gửi (lương, deadline, mô tả...) đều bị bỏ qua, không ghi đè lên job cũ. false = job vừa được tạo mới thật sự.
              */
             was_existing: boolean;
+            /**
+             * Similar Jobs
+             * @description Cảnh báo (A3): các job đang mở KHÁC của cùng công ty, cùng tên job và tỉnh nhưng khác level. POST /jobs vẫn tạo job (level do nhân viên chọn nên cho phép), client nên báo để nhân viên kiểm tra có phải nhập trùng không. Rỗng = không có job giống. Không gồm chính job trả về.
+             */
+            similar_jobs?: components["schemas"]["SimilarJobOut"][];
         };
         /**
          * JobDataHealth
@@ -3886,10 +3896,10 @@ export interface components {
         /**
          * JobHealthRow
          * @description 1 dòng thống kê "thiếu field" — dùng chung với company, xem
-         *     FieldHealthRow (api/schemas/companies.py). Định nghĩa RIÊNG (không
+         *     FieldHealthRow (scrapjd/api/schemas/companies.py). Định nghĩa RIÊNG (không
          *     import chéo companies.py) để tránh phụ thuộc ngược lại companies.py
          *     -> jobs.py (jobs.py hiện KHÔNG phụ thuộc companies.py, xem lưu ý ở
-         *     api/schemas/__init__.py — giữ nguyên hướng phụ thuộc 1 chiều đó).
+         *     scrapjd/api/schemas/__init__.py — giữ nguyên hướng phụ thuộc 1 chiều đó).
          */
         JobHealthRow: {
             /** Field */
@@ -4422,7 +4432,7 @@ export interface components {
         /**
          * RegisterOut
          * @description KHÔNG trả access_token/refresh_token — đăng ký xong PHẢI xác
-         *     thực email trước mới login được (xem api/routers/auth.py login()),
+         *     thực email trước mới login được (xem scrapjd/api/routers/auth.py login()),
          *     nên trả về thông báo hướng dẫn thay vì token.
          */
         RegisterOut: {
@@ -4489,7 +4499,7 @@ export interface components {
          *     {row_index}/resolve-company — staff chọn 1 công ty (hoặc "Tạo công ty
          *     mới") trong modal chọn công ty ở bước preview, cho dòng
          *     conflict_status="pending_company_resolution" (chỉ job/contact — xem
-         *     api/services/preview_manager.py::resolve_company_selection()).
+         *     scrapjd/api/services/preview_manager.py::resolve_company_selection()).
          *
          *     Re-check conflict NGAY với company_id thật vừa chọn, thay vì để treo
          *     tới lúc confirm (xem trao đổi thiết kế "vấn đề 2 & 3", 08/2026).
@@ -4521,12 +4531,12 @@ export interface components {
          *     Sửa 08/2026 (fix bug reactivate không hoạt động): action enum ở đây
          *     TRƯỚC ĐÂY là "create_new | use_existing | skip" và field
          *     "confirm_reactivate" hoàn toàn không tồn tại — trong khi
-         *     api/services/import_executor.py (nơi thực thi thật) lại đọc
+         *     scrapjd/api/services/import_executor.py (nơi thực thi thật) lại đọc
          *     action là "skip"|"create"|"update" và đọc resolution.get(
          *     "confirm_reactivate") cho dòng conflict_inactive (xem
          *     RowResolutionError docstring + dòng 121-124 file đó). Vì router
          *     convert RowResolution -> dict bằng .model_dump() (xem
-         *     api/routers/import_export.py), field lạ "confirm_reactivate" gửi
+         *     scrapjd/api/routers/import_export.py), field lạ "confirm_reactivate" gửi
          *     từ frontend bị Pydantic ÂM THẦM loại bỏ — nghĩa là flow "ghi đè +
          *     kích hoạt lại record inactive" không bao giờ chạy được, dù cả
          *     frontend lẫn import_executor.py đều đã code đúng phần của mình.
@@ -4623,6 +4633,23 @@ export interface components {
             /** Saved */
             saved: boolean;
             data?: components["schemas"]["SavedJobOut"] | null;
+        };
+        /**
+         * SimilarJobOut
+         * @description Một job đang mở có cùng khoá chống trùng (công ty + tên job + tỉnh) với job vừa nhập,
+         *     nhưng KHÁC level (cùng level thì POST /jobs đã trả lại chính job đó, xem was_existing).
+         */
+        SimilarJobOut: {
+            /** Job Id */
+            job_id: string;
+            /** Job Title */
+            job_title: string;
+            /** Level Code */
+            level_code?: string | null;
+            /** Job Status */
+            job_status: string;
+            /** Deadline */
+            deadline?: string | null;
         };
         /** SkillCount */
         SkillCount: {
@@ -6934,9 +6961,9 @@ export interface operations {
                 company_id?: string | null;
                 /** @description Cột áp from_date/to_date. */
                 date_field?: "created_at" | "updated_at";
-                /** @description Từ ngày (inclusive), theo date_field. */
+                /** @description Từ ngày (gồm ngày này), tính theo NGÀY VIỆT NAM (UTC+7), theo date_field. */
                 from_date?: string | null;
-                /** @description Đến ngày (inclusive), theo date_field. */
+                /** @description Đến hết ngày này (gồm cả ngày này), tính theo NGÀY VIỆT NAM (UTC+7), theo date_field. */
                 to_date?: string | null;
                 /** @description Không lọc gì, chỉ muốn N dòng MỚI NHẤT? Truyền limit — áp SAU khi lọc theo các filter khác (nếu có), sắp theo created_at giảm dần. */
                 limit?: number | null;
@@ -6982,9 +7009,9 @@ export interface operations {
                 company_id?: string | null;
                 /** @description Cột áp from_date/to_date. */
                 date_field?: "created_at" | "updated_at";
-                /** @description Từ ngày (inclusive), theo date_field. */
+                /** @description Từ ngày (gồm ngày này), tính theo NGÀY VIỆT NAM (UTC+7), theo date_field. */
                 from_date?: string | null;
-                /** @description Đến ngày (inclusive), theo date_field. */
+                /** @description Đến hết ngày này (gồm cả ngày này), tính theo NGÀY VIỆT NAM (UTC+7), theo date_field. */
                 to_date?: string | null;
                 /** @description Không lọc gì, chỉ muốn N dòng MỚI NHẤT? Truyền limit — áp SAU khi lọc theo các filter khác (nếu có), sắp theo created_at giảm dần. */
                 limit?: number | null;
