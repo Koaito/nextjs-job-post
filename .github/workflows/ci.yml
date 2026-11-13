@@ -1,7 +1,7 @@
 name: CI
 
 # Chạy trên mọi PR và mọi push lên main. Một job duy nhất (typecheck -> lint ->
-# test -> build) để cache npm dùng chung; tách job khi Playwright vào (mục 2e).
+# test -> build) để cache npm dùng chung. Playwright (mục 2e) chạy ở workflow riêng: e2e.yml.
 on:
   pull_request:
   push:

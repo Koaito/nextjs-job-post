@@ -1,0 +1,139 @@
+name: E2E
+
+# Playwright chạy trình duyệt thật -> Next.js (bản build) -> backend Scrap JD thật -> Postgres thật (mục 2e).
+# Tách khỏi ci.yml vì cần kéo cả repo backend, cài Python và chạy lâu hơn; ci.yml vẫn là cổng nhanh (tsc/lint/Vitest/build).
+#
+# THIẾT LẬP MỘT LẦN (Settings -> Secrets and variables -> Actions -> tab Variables):
+#   BACKEND_REPO  bắt buộc, dạng "chu-so-huu/ten-repo-backend" (repo Scrap JD)
+#   BACKEND_REF   tuỳ chọn, nhánh/tag backend để chạy cùng (mặc định main)
+# Repo backend riêng tư thì thêm secret BACKEND_REPO_TOKEN (PAT chỉ đọc nội dung repo đó).
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Giá trị GIẢ, chỉ có hiệu lực trong lượt chạy này và trên DB tạm của nó. Không phải secret.
+  API_KEY: e2e-api-key-not-a-secret
+  JWT_SECRET_KEY: e2e-jwt-secret-not-a-secret-0123456789abcdef
+  E2E_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/scrapjd_e2e
+
+jobs:
+  e2e:
+    name: Playwright (backend + Postgres thật)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: scrapjd_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Kiểm tra đã khai báo BACKEND_REPO
+        env:
+          BACKEND_REPO: ${{ vars.BACKEND_REPO }}
+        run: |
+          if [ -z "$BACKEND_REPO" ]; then
+            echo "::error::Chưa có biến Actions BACKEND_REPO (dạng chu-so-huu/ten-repo-backend). Xem chú thích đầu .github/workflows/e2e.yml."
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ vars.BACKEND_REPO }}
+          ref: ${{ vars.BACKEND_REF || 'main' }}
+          token: ${{ secrets.BACKEND_REPO_TOKEN || github.token }}
+          path: backend
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Cài psql (nạp dữ liệu nền) và phụ thuộc backend
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+          pip install -r backend/requirements.txt
+
+      - name: Dựng schema và chạy backend
+        working-directory: backend
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGDATABASE: scrapjd_e2e
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGSSLMODE: disable
+          ALLOWED_ORIGINS: http://localhost:3100
+          FRONTEND_BASE_URL: http://localhost:3100
+          API_BASE_URL: http://localhost:8000
+        run: |
+          python main.py init-db
+          nohup python -m uvicorn scrapjd.api.app:app --port 8000 > "$GITHUB_WORKSPACE/backend.log" 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -sf -H "X-API-Key: $API_KEY" http://127.0.0.1:8000/health > /dev/null; then
+              echo "Backend sẵn sàng sau ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::Backend không lên sau 30 giây"; cat "$GITHUB_WORKSPACE/backend.log"; exit 1
+
+      - name: Cài phụ thuộc frontend
+        run: npm ci
+
+      - name: Cài trình duyệt Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Build
+        run: npm run build
+        env:
+          CRAWLER_API_URL: http://127.0.0.1:8000
+          CRAWLER_API_KEY: ${{ env.API_KEY }}
+          NEXT_PUBLIC_APP_URL: http://localhost:3100
+          NEXT_TELEMETRY_DISABLED: "1"
+
+      - name: Playwright
+        run: npm run test:e2e
+        env:
+          E2E_BACKEND_URL: http://127.0.0.1:8000
+          E2E_API_KEY: ${{ env.API_KEY }}
+
+      - name: Lưu báo cáo và log khi lỗi
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-debug
+          path: |
+            playwright-report/
+            test-results/
+            backend.log
+          retention-days: 7
+          if-no-files-found: ignore
