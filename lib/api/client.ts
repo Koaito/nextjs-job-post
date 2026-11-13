@@ -14,6 +14,10 @@ export class ApiError extends Error {
     public status?: number,
     public errorCode?: string,
     public params?: Record<string, string | number>,
+    /** Nguyên object `detail` của backend (Dạng 1) — để đọc field ngoài
+     *  error_code/message/params, vd mảng `errors` chi tiết từng dòng của
+     *  422 import_row_validation_failed. Không có ở Dạng 2/3. */
+    public detail?: Record<string, unknown>,
   ) {
     super(message);
     this.name = "ApiError";
@@ -29,11 +33,11 @@ export class ApiError extends Error {
  *   2. { detail: [{ loc, msg, type }, ...] }          -> lỗi validate tự động của Pydantic (mảng)
  *   3. Không khớp 2 dạng trên (429 rate-limit, lỗi hạ tầng...) -> fallback message chung
  */
-async function rawFetch<T>(
+async function fetchOk(
   path: string,
   init: RequestInit = {},
   token?: string,
-): Promise<T> {
+): Promise<Response> {
   // Body là FormData (multipart, vd nộp CV — POST /me/applications) thì
   // TUYỆT ĐỐI không tự đặt Content-Type: fetch phải tự sinh header kèm
   // `boundary=...`, ép "application/json" sẽ làm backend không parse được
@@ -97,6 +101,7 @@ async function rawFetch<T>(
         res.status,
         detail.error_code,
         detail.params,
+        detail as Record<string, unknown>,
       );
     }
 
@@ -118,6 +123,17 @@ async function rawFetch<T>(
     throw new ApiError("Lỗi không xác định", res.status);
   }
 
+  return res;
+}
+
+/** fetchOk + parse JSON — cho mọi route trả JSON (đa số). */
+async function rawFetch<T>(
+  path: string,
+  init: RequestInit = {},
+  token?: string,
+): Promise<T> {
+  const res = await fetchOk(path, init, token);
+
   // Vài route trả 204 No Content (vd DELETE) -> không có body để parse
   if (res.status === 204) return undefined as T;
 
@@ -137,19 +153,26 @@ async function rawFetch<T>(
  * cookie cho 429/5xx/lỗi mạng, vì các lỗi đó không nói lên gì về tính
  * hợp lệ của phiên đăng nhập (xem Phần 2 mục 3 của plan).
  */
-export async function callAuthed<T>(
-  path: string,
-  init: RequestInit = {},
-): Promise<T> {
+async function withAuthRetry<R>(
+  run: (token: string | undefined) => Promise<R>,
+  opts: { canRetry: boolean } = { canRetry: true },
+): Promise<R> {
   const accessToken = await getValidAccessToken();
 
   try {
-    return await rawFetch<T>(path, init, accessToken ?? undefined);
+    return await run(accessToken ?? undefined);
   } catch (err) {
     // Chỉ retry khi lỗi thật sự là 401 do access token.
     // KHÔNG retry cho 429/5xx/lỗi mạng — refresh không sửa được các lỗi
     // này, và retry có thể khiến 1 lỗi tạm thời bị hiểu nhầm thành hết phiên.
     if (!(err instanceof ApiError) || err.status !== 401) throw err;
+
+    // Body dạng stream (import file, forward `req.body`) chỉ đọc được 1 lần:
+    // sau lần gọi đầu nó đã bị tiêu thụ, gọi lại sẽ gửi body rỗng/lỗi. Với
+    // các lời gọi này KHÔNG refresh phản ứng — để 401 lan lên cho nơi gọi
+    // báo người dùng thử lại (token đã được refresh CHỦ ĐỘNG ở
+    // getValidAccessToken() phía trên nên 401 ở đây rất hiếm).
+    if (!opts.canRetry) throw err;
 
     const refresh = await forceRefreshWithReason();
     if (refresh.token === null) {
@@ -166,11 +189,58 @@ export async function callAuthed<T>(
       }
       throw err;
     }
-    const refreshedToken = refresh.token;
 
     // Thử lại đúng 1 lần, không catch tiếp (tránh lặp vô hạn).
-    return rawFetch<T>(path, init, refreshedToken);
+    return run(refresh.token);
   }
+}
+
+/**
+ * Gọi API CẦN auth — đây là hàm DUY NHẤT mọi module lib/api/*.ts phải
+ * dùng khi cần token. 2 lớp refresh:
+ *   1. Chủ động: getValidAccessToken() tự refresh theo `exp` đọc từ JWT
+ *      (cơ chế chính, xem lib/session.ts).
+ *   2. Phản ứng: nếu vẫn dính 401 sau đó (lệch giờ, token bị thu hồi
+ *      ngoài dự kiến, trúng đúng khoảnh khắc hết hạn) -> refresh phản
+ *      ứng đúng 1 lần rồi gọi lại request gốc đúng 1 lần. KHÔNG lặp vô hạn.
+ *
+ * Chỉ xoá cookie phiên khi refresh phản ứng CŨNG thất bại — không xoá
+ * cookie cho 429/5xx/lỗi mạng, vì các lỗi đó không nói lên gì về tính
+ * hợp lệ của phiên đăng nhập (xem Phần 2 mục 3 của plan).
+ *
+ * Logic refresh nằm ở withAuthRetry() ở trên — callAuthed() và
+ * callAuthedStream() dưới đây chỉ khác nhau ở cách đọc response, KHÔNG
+ * có bản refresh thứ hai.
+ */
+export async function callAuthed<T>(
+  path: string,
+  init: RequestInit = {},
+): Promise<T> {
+  return withAuthRetry((token) => rawFetch<T>(path, init, token));
+}
+
+/**
+ * Giống callAuthed() nhưng trả nguyên `Response` (chưa đọc body) — cho
+ * route trả FILE hoặc nhận body dạng stream (Nhóm 6: tải file export,
+ * upload file import qua Route Handler). Lỗi (status >= 400) vẫn được
+ * chuẩn hoá thành ApiError y hệt callAuthed().
+ *
+ * Nơi gọi chịu trách nhiệm đọc/forward body của Response (vd
+ * `new Response(res.body, { headers })`) và copy đúng header cần thiết
+ * (Content-Disposition, Content-Type).
+ *
+ * Nếu `init.body` là ReadableStream thì KHÔNG retry sau 401 (stream chỉ
+ * đọc được 1 lần) — xem withAuthRetry().
+ */
+export async function callAuthedStream(
+  path: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  const isStreamBody =
+    typeof ReadableStream !== "undefined" && init.body instanceof ReadableStream;
+  return withAuthRetry((token) => fetchOk(path, init, token), {
+    canRetry: !isStreamBody,
+  });
 }
 
 /** Dùng cho các route KHÔNG cần auth nhưng vẫn cần X-API-Key (vd GET /sources,
