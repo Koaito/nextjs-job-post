@@ -33,7 +33,9 @@ export function sessionEndReasonFromCode(
   errorCode: string | null | undefined,
 ): SessionEndReason | null {
   if (!errorCode) return null;
-  return CODE_TO_REASON[errorCode] ?? null;
+  // hasOwn: object literal thừa hưởng key của Object.prototype, nên
+  // CODE_TO_REASON["constructor"] sẽ trả về hàm thay vì undefined.
+  return Object.hasOwn(CODE_TO_REASON, errorCode) ? CODE_TO_REASON[errorCode] : null;
 }
 
 /** Dùng cho giá trị đọc từ query string (?reason=) — không tin thẳng. */

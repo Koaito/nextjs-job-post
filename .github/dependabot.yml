@@ -1,0 +1,10 @@
+# Chỉ theo dõi GitHub Actions (action đang được ghim theo SHA nên không tự
+# cập nhật). Phụ thuộc npm chưa bật ở đây — thêm khối "npm" khi cần.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "chore(ci)"
