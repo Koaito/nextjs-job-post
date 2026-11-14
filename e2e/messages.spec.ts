@@ -7,9 +7,31 @@ import { ACCOUNTS, clientIpHeaders, expect, login, test } from "./helpers";
 // Các bước phụ thuộc nhau (trạng thái quan hệ sống trong DB) nên chạy tuần tự, dừng ngay khi một bước hỏng.
 //
 // Backend giới hạn tốc độ theo từng người dùng (gửi 1 tin/giây và 20/phút, danh sách hội thoại 10/phút),
-// nên spec này cố ý ít lần tải trang và để khoảng nghỉ giữa các tin.
+// nên spec này cố ý ít lần tải trang và gửi tin qua sendMessage() (luôn chờ đủ khoảng nghỉ giữa hai tin của
+// CÙNG một người). Không được gửi bằng fill + click trực tiếp: nếu hai lần gửi cách nhau dưới 1 giây thì tin
+// thứ hai bị 429, giao diện gỡ bong bóng tạm và hiện toast lỗi, còn test có thể đạt oan nhờ bong bóng tạm.
+//
+// retries: 0 vì các test trong nhóm dựa vào trạng thái quan hệ đã ghi vào DB; chạy lại giữa chừng không cho
+// trạng thái ban đầu nên chỉ che lỗi gốc bằng một lỗi khác (vd "chờ SS chấp nhận" không còn hiện).
 
-test.describe.configure({ mode: "serial" });
+test.describe.configure({ mode: "serial", retries: 0 });
+
+/** Khoảng nghỉ tối thiểu giữa hai tin của cùng một người, lớn hơn giới hạn 1 tin/giây của backend. */
+const MIN_SEND_GAP_MS = 1_200;
+const lastSendAt = new WeakMap<Page, number>();
+
+/** Điền và gửi một tin, chờ đủ MIN_SEND_GAP_MS kể từ lần gửi trước của trang này. */
+async function sendMessage(page: Page, text: string) {
+  const wait = MIN_SEND_GAP_MS - (Date.now() - (lastSendAt.get(page) ?? 0));
+  if (wait > 0) await page.waitForTimeout(wait);
+  await page.getByLabel("Nội dung tin nhắn").fill(text);
+  await page.getByRole("button", { name: "Gửi", exact: true }).click();
+  lastSendAt.set(page, Date.now());
+}
+
+/** Bong bóng của tin ĐÃ LƯU (có data-id). Bong bóng tạm "Đang gửi…" không có data-id và biến mất nếu gửi lỗi. */
+const saved = (page: Page, partnerName: string, text: string) =>
+  log(page, partnerName).locator("[data-id]", { hasText: text });
 
 const log = (page: Page, partnerName: string) =>
   page.getByRole("log", { name: `Tin nhắn với ${partnerName}` });
@@ -44,8 +66,7 @@ test.describe("nhắn tin học viên <-> SS", () => {
     await expect(studentPage.getByRole("heading", { level: 1 })).toContainText(ACCOUNTS.msgSs.name);
     await expect(studentPage.getByText(/Chưa có tin nhắn nào/)).toBeVisible();
 
-    await studentPage.getByLabel("Nội dung tin nhắn").fill("Em chào chị, em muốn hỏi về job intern ạ.");
-    await studentPage.getByRole("button", { name: "Gửi", exact: true }).click();
+    await sendMessage(studentPage, "Em chào chị, em muốn hỏi về job intern ạ.");
 
     await expect(studentPage.getByText(/chờ SS chấp nhận/)).toBeVisible();
     // Yêu cầu chưa được chấp nhận thì tin KHÔNG được lưu, nên không có bong bóng nào.
@@ -64,9 +85,9 @@ test.describe("nhắn tin học viên <-> SS", () => {
   test("sau khi được chấp nhận, học viên nhắn được và tin hiện ngay", async () => {
     await studentPage.reload();
     const messages = log(studentPage, ACCOUNTS.msgSs.name);
-    await studentPage.getByLabel("Nội dung tin nhắn").fill("Em cảm ơn chị đã chấp nhận ạ.");
-    await studentPage.getByRole("button", { name: "Gửi", exact: true }).click();
-    await expect(messages.getByText("Em cảm ơn chị đã chấp nhận ạ.")).toBeVisible();
+    await sendMessage(studentPage, "Em cảm ơn chị đã chấp nhận ạ.");
+    // Phải là tin ĐÃ LƯU (data-id), không chỉ bong bóng tạm: gửi lỗi (429...) cũng từng hiện bong bóng tạm một lúc.
+    await expect(saved(studentPage, ACCOUNTS.msgSs.name, "Em cảm ơn chị đã chấp nhận ạ.")).toBeVisible();
     await expect(messages.getByText("Đang gửi…")).toHaveCount(0); // tin tạm đã được thay bằng tin thật
   });
 
@@ -76,9 +97,8 @@ test.describe("nhắn tin học viên <-> SS", () => {
     const ssLog = log(ssPage, ACCOUNTS.msgStudent.name);
     await expect(ssLog.getByText("Em cảm ơn chị đã chấp nhận ạ.")).toBeVisible();
 
-    await ssPage.getByLabel("Nội dung tin nhắn").fill("Chào em, chị trả lời ngay đây.");
-    await ssPage.getByRole("button", { name: "Gửi", exact: true }).click();
-    await expect(ssLog.getByText("Chào em, chị trả lời ngay đây.")).toBeVisible();
+    await sendMessage(ssPage, "Chào em, chị trả lời ngay đây.");
+    await expect(saved(ssPage, ACCOUNTS.msgStudent.name, "Chào em, chị trả lời ngay đây.")).toBeVisible();
 
     // Học viên KHÔNG reload: tin phải tới qua polling (chu kỳ cơ bản 5 giây).
     await expect(log(studentPage, ACCOUNTS.msgSs.name).getByText("Chào em, chị trả lời ngay đây.")).toBeVisible({
@@ -94,11 +114,10 @@ test.describe("nhắn tin học viên <-> SS", () => {
       void d.dismiss();
     });
 
-    await studentPage.getByLabel("Nội dung tin nhắn").fill(payload);
-    await studentPage.getByRole("button", { name: "Gửi", exact: true }).click();
+    await sendMessage(studentPage, payload);
 
     const messages = log(studentPage, ACCOUNTS.msgSs.name);
-    await expect(messages.getByText(payload)).toBeVisible();
+    await expect(saved(studentPage, ACCOUNTS.msgSs.name, payload)).toBeVisible();
     await expect(messages.locator("b, img")).toHaveCount(0);
     expect(await studentPage.evaluate(() => (window as unknown as { __xss?: number }).__xss)).toBeUndefined();
     expect(dialogs).toBe(0);
