@@ -54,9 +54,11 @@ sinh lại sẽ làm CI đỏ. CI **không** tự biết backend đã đổi: b�
 ## Test e2e (Playwright)
 
 `e2e/` chạy trình duyệt thật → Next.js (bản build) → backend Scrap JD thật → Postgres thật, không mock gì ở giữa.
-Hiện có 3 spec: `auth` (đăng nhập, đăng xuất, chặn khách, chống open-redirect, verify-origin, `session_replaced`),
+Hiện có 4 spec: `auth` (đăng nhập, đăng xuất, chặn khách, chống open-redirect, verify-origin, `session_replaced`),
+`session-lifecycle` (đổi mật khẩu, thu hồi phiên phía server, cookie hỏng, hết hạn, tài khoản bị khoá),
 `jobs-public` (xem `/jobs` khi chưa đăng nhập, phân trang, lọc, 404) và `messages` (yêu cầu nhắn tin, chấp nhận,
-polling, tin chứa HTML hiện thành chữ thô).
+polling, tin chứa HTML hiện thành chữ thô). Các ca hết hạn / khoá tài khoản chỉnh thẳng DB e2e nên cần
+`E2E_DATABASE_URL` (không đặt thì tự bỏ qua).
 
 Chạy local (cần repo backend, Postgres và `psql`):
 

@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { test as base, expect, type Page } from "@playwright/test";
 
 export const BACKEND_URL = process.env.E2E_BACKEND_URL ?? "http://127.0.0.1:8000";
@@ -16,6 +17,10 @@ export const ACCOUNTS = {
   jobsStudent: { email: "jobs-student@e2e.test", name: "E2E Jobs Student" },
   msgStudent: { email: "msg-student@e2e.test", name: "Học Viên Nhắn Tin" },
   msgSs: { email: "msg-ss@e2e.test", name: "SS Mai Linh E2E" },
+  pwChange: { email: "pwchange@e2e.test", name: "E2E PwChange Student" },
+  revoke: { email: "revoke@e2e.test", name: "E2E Revoke Student" },
+  expiry: { email: "expiry@e2e.test", name: "E2E Expiry Student" },
+  locked: { email: "locked@e2e.test", name: "E2E Locked Student" },
 } as const;
 
 /** Điền form /login và gửi. Không chờ điều hướng: mỗi test tự khẳng định nơi đến. */
@@ -39,6 +44,46 @@ export const DATA_JOB_TITLE = "E2E Data Analyst Intern";
 // Cookie phiên duy nhất (Mục 3, Pha B). Hai cookie cũ chỉ còn để kiểm proxy dọn chúng.
 export const SESSION_COOKIES = ["mx_session"];
 export const LEGACY_SESSION_COOKIES = ["mx_access", "mx_refresh"];
+
+// ---------------------------------------------------------------------------------------------------------
+// Chạm thẳng DB e2e (đổi hạn phiên, khoá tài khoản) cho những ca mà giao diện không có đường nào tới.
+// Cùng lá chắn với scripts/e2e-db.mjs: chỉ chạy trên database có "e2e" hoặc "test" trong tên. Không import từ
+// file đó vì Playwright nạp spec như CommonJS, mà .mjs là ESM.
+// ---------------------------------------------------------------------------------------------------------
+export const HAS_E2E_DB = Boolean(process.env.E2E_DATABASE_URL);
+
+export function sql(statement: string): string {
+  const url = process.env.E2E_DATABASE_URL;
+  if (!url) throw new Error("Thiếu E2E_DATABASE_URL: ca này cần chạm thẳng DB e2e.");
+  const dbName = decodeURIComponent(new URL(url).pathname.replace(/^\//, ""));
+  if (!/e2e|test/i.test(dbName)) {
+    throw new Error(`Từ chối chạy SQL: database "${dbName}" không chứa "e2e" hoặc "test" trong tên.`);
+  }
+  const r = spawnSync("psql", [url, "-v", "ON_ERROR_STOP=1", "-qtA", "-c", statement], { encoding: "utf8" });
+  if (r.error) throw new Error(`Không chạy được psql: ${r.error.message}`);
+  if (r.status !== 0) throw new Error(`psql lỗi: ${r.stderr}`);
+  return r.stdout.trim();
+}
+
+/** Đổi mật khẩu thẳng qua backend (không qua giao diện) để trả tài khoản về trạng thái seed sau ca đổi mật khẩu. */
+export async function changePasswordViaBackend(email: string, from: string, to: string) {
+  const call = (path: string, body: unknown, token?: string) =>
+    fetch(`${BACKEND_URL}${path}`, {
+      method: "POST",
+      headers: {
+        "X-API-Key": API_KEY,
+        "X-Client-IP": freshClientIp(),
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+  const login = await call("/auth/login", { email, password: from });
+  if (!login.ok) throw new Error(`Khôi phục mật khẩu: đăng nhập ${email} lỗi ${login.status}`);
+  const { session_token: token } = (await login.json()) as { session_token: string };
+  const res = await call("/auth/change-password", { old_password: from, new_password: to }, token);
+  if (!res.ok) throw new Error(`Khôi phục mật khẩu: đổi lỗi ${res.status} ${await res.text()}`);
+}
 
 // ---------------------------------------------------------------------------------------------------------
 // IP khách riêng cho từng test.

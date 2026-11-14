@@ -27,5 +27,9 @@ FROM (VALUES
     ('E2E BadPass Student',   'badpass@e2e.test',      'user'),
     ('E2E Jobs Student',      'jobs-student@e2e.test', 'user'),
     ('Học Viên Nhắn Tin',     'msg-student@e2e.test',  'user'),
-    ('SS Mai Linh E2E',       'msg-ss@e2e.test',       'ss_team')
+    ('SS Mai Linh E2E',       'msg-ss@e2e.test',       'ss_team'),
+    ('E2E PwChange Student',  'pwchange@e2e.test',     'user'),
+    ('E2E Revoke Student',    'revoke@e2e.test',       'user'),
+    ('E2E Expiry Student',    'expiry@e2e.test',       'user'),
+    ('E2E Locked Student',    'locked@e2e.test',       'user')
 ) AS v(full_name, email, role);
