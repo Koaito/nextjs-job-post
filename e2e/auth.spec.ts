@@ -1,4 +1,4 @@
-import { ACCOUNTS, SESSION_COOKIES, clientIpHeaders, expect, login, submitLogin, test } from "./helpers";
+import { ACCOUNTS, LEGACY_SESSION_COOKIES, SESSION_COOKIES, clientIpHeaders, expect, login, submitLogin, test } from "./helpers";
 
 // Đăng nhập / đăng xuất / chặn khách / session_replaced, chạy với backend thật.
 
@@ -52,6 +52,9 @@ test.describe("đăng nhập", () => {
     }
     // Token không được lọt vào JS phía trình duyệt.
     expect(await page.evaluate(() => document.cookie)).not.toContain("mx_");
+    // Chỉ MỘT cookie phiên, không còn cookie access/refresh cũ.
+    const names = cookies.map((c) => c.name);
+    for (const name of LEGACY_SESSION_COOKIES) expect(names).not.toContain(name);
   });
 
   test("staff đăng nhập -> /dashboard", async ({ page }) => {
@@ -66,8 +69,7 @@ test.describe("đăng nhập", () => {
     await expect(page.locator("form .bg-red-50")).toBeVisible();
     await expect(page).toHaveURL(/\/login$/);
     const names = (await context.cookies()).map((c) => c.name);
-    expect(names).not.toContain("mx_access");
-    expect(names).not.toContain("mx_refresh");
+    for (const name of [...SESSION_COOKIES, ...LEGACY_SESSION_COOKIES]) expect(names).not.toContain(name);
   });
 
   test("đăng nhập từ trang bị chặn thì quay lại đúng trang đó", async ({ page }) => {
@@ -98,8 +100,7 @@ test.describe("đăng xuất", () => {
     await expect(page).toHaveURL(/\/login$/);
 
     const names = (await context.cookies()).map((c) => c.name);
-    expect(names).not.toContain("mx_access");
-    expect(names).not.toContain("mx_refresh");
+    for (const name of [...SESSION_COOKIES, ...LEGACY_SESSION_COOKIES]) expect(names).not.toContain(name);
 
     await page.goto("/profile/security");
     await expect(page).toHaveURL(/\/login\?next=/);

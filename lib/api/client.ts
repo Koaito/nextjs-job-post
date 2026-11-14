@@ -1,11 +1,14 @@
 // lib/api/client.ts
 // Tương đương _call_authed (helpers.py) + crawler_client/base.py bên Flask.
 // NGUYÊN TẮC: chỉ viết callAuthed() đúng 1 lần duy nhất trong toàn bộ app.
-// Mọi hàm trong lib/api/*.ts (jobs.ts, companies.ts...) đều gọi qua đây,
-// không tự viết logic refresh riêng ở bất kỳ đâu khác.
+// Mọi hàm trong lib/api/*.ts (jobs.ts, companies.ts...) đều gọi qua đây.
+//
+// Mục 3 (Pha B): session mờ — KHÔNG còn refresh/retry. Token trong cookie không hết hạn
+// theo phút và không xoay vòng, nên một lời gọi chỉ cần đúng một lần gửi. 401 thuộc nhóm
+// "phiên kết thúc" (session_replaced / session_revoked) được ném nguyên cho nơi gọi
+// (getSessionState, route polling...) tự xử lý bằng sessionEndReasonFromCode.
 
-import { getValidAccessToken, forceRefreshWithReason } from "@/lib/session";
-import { sessionEndReasonFromCode } from "@/lib/session-end";
+import { getSessionToken } from "@/lib/session";
 import { getClientIpHeaders } from "@/lib/client-ip-server";
 
 export class ApiError extends Error {
@@ -25,7 +28,7 @@ export class ApiError extends Error {
 }
 
 /**
- * Gọi thẳng Scrap_JD, không xử lý auth/refresh — chỉ lo phần forward
+ * Gọi thẳng Scrap_JD, không xử lý auth — chỉ lo phần forward
  * request + parse lỗi đúng 3 hình dạng JSON thật mà backend trả về.
  *
  * QUAN TRỌNG: FastAPI tự bọc lỗi trong "detail". Có 3 hình dạng:
@@ -141,82 +144,19 @@ async function rawFetch<T>(
 }
 
 /**
- * Gọi API CẦN auth — đây là hàm DUY NHẤT mọi module lib/api/*.ts phải
- * dùng khi cần token. 2 lớp refresh:
- *   1. Chủ động: getValidAccessToken() tự refresh theo `exp` đọc từ JWT
- *      (cơ chế chính, xem lib/session.ts).
- *   2. Phản ứng: nếu vẫn dính 401 sau đó (lệch giờ, token bị thu hồi
- *      ngoài dự kiến, trúng đúng khoảnh khắc hết hạn) -> refresh phản
- *      ứng đúng 1 lần rồi gọi lại request gốc đúng 1 lần. KHÔNG lặp vô hạn.
+ * Gọi API CẦN auth — hàm DUY NHẤT mọi module lib/api/*.ts dùng khi cần token. Gắn session
+ * token từ cookie (nếu có) rồi gửi ĐÚNG MỘT LẦN; không refresh, không thử lại.
  *
- * Chỉ xoá cookie phiên khi refresh phản ứng CŨNG thất bại — không xoá
- * cookie cho 429/5xx/lỗi mạng, vì các lỗi đó không nói lên gì về tính
- * hợp lệ của phiên đăng nhập (xem Phần 2 mục 3 của plan).
- */
-async function withAuthRetry<R>(
-  run: (token: string | undefined) => Promise<R>,
-  opts: { canRetry: boolean } = { canRetry: true },
-): Promise<R> {
-  const accessToken = await getValidAccessToken();
-
-  try {
-    return await run(accessToken ?? undefined);
-  } catch (err) {
-    // Chỉ retry khi lỗi thật sự là 401 do access token.
-    // KHÔNG retry cho 429/5xx/lỗi mạng — refresh không sửa được các lỗi
-    // này, và retry có thể khiến 1 lỗi tạm thời bị hiểu nhầm thành hết phiên.
-    if (!(err instanceof ApiError) || err.status !== 401) throw err;
-
-    // Body dạng stream (import file, forward `req.body`) chỉ đọc được 1 lần:
-    // sau lần gọi đầu nó đã bị tiêu thụ, gọi lại sẽ gửi body rỗng/lỗi. Với
-    // các lời gọi này KHÔNG refresh phản ứng — để 401 lan lên cho nơi gọi
-    // báo người dùng thử lại (token đã được refresh CHỦ ĐỘNG ở
-    // getValidAccessToken() phía trên nên 401 ở đây rất hiếm).
-    if (!opts.canRetry) throw err;
-
-    const refresh = await forceRefreshWithReason();
-    if (refresh.token === null) {
-      // Refresh phản ứng cũng thất bại -> đây là điểm DUY NHẤT lỗi 401
-      // gốc được lan tiếp lên cho nơi gọi tự xử lý (redirect /login,
-      // banner theo error_code — xem lib/auth-guard.ts và Phụ lục C).
-      //
-      // Nếu refresh thất bại vì lý do cần báo người dùng (vd refresh token
-      // đã bị thu hồi do đăng nhập nơi khác — auth_refresh_token_thu_hoi_truoc)
-      // thì ném lỗi MANG error_code của refresh, vì 401 gốc thường chỉ là
-      // token_expired chung chung, không cho nơi gọi biết nguyên nhân thật.
-      if (sessionEndReasonFromCode(refresh.errorCode) !== null) {
-        throw new ApiError(err.message, 401, refresh.errorCode);
-      }
-      throw err;
-    }
-
-    // Thử lại đúng 1 lần, không catch tiếp (tránh lặp vô hạn).
-    return run(refresh.token);
-  }
-}
-
-/**
- * Gọi API CẦN auth — đây là hàm DUY NHẤT mọi module lib/api/*.ts phải
- * dùng khi cần token. 2 lớp refresh:
- *   1. Chủ động: getValidAccessToken() tự refresh theo `exp` đọc từ JWT
- *      (cơ chế chính, xem lib/session.ts).
- *   2. Phản ứng: nếu vẫn dính 401 sau đó (lệch giờ, token bị thu hồi
- *      ngoài dự kiến, trúng đúng khoảnh khắc hết hạn) -> refresh phản
- *      ứng đúng 1 lần rồi gọi lại request gốc đúng 1 lần. KHÔNG lặp vô hạn.
- *
- * Chỉ xoá cookie phiên khi refresh phản ứng CŨNG thất bại — không xoá
- * cookie cho 429/5xx/lỗi mạng, vì các lỗi đó không nói lên gì về tính
- * hợp lệ của phiên đăng nhập (xem Phần 2 mục 3 của plan).
- *
- * Logic refresh nằm ở withAuthRetry() ở trên — callAuthed() và
- * callAuthedStream() dưới đây chỉ khác nhau ở cách đọc response, KHÔNG
- * có bản refresh thứ hai.
+ * Lỗi 401 (và mọi lỗi khác) được chuẩn hoá thành ApiError và ném nguyên. Hàm này KHÔNG xoá
+ * cookie: Server Component không được ghi cookie, nên việc dọn cookie chết do tầng trình
+ * duyệt / Route Handler đảm nhiệm (lib/session-end-client.ts, SessionEndListener).
  */
 export async function callAuthed<T>(
   path: string,
   init: RequestInit = {},
 ): Promise<T> {
-  return withAuthRetry((token) => rawFetch<T>(path, init, token));
+  const token = await getSessionToken();
+  return rawFetch<T>(path, init, token ?? undefined);
 }
 
 /**
@@ -227,20 +167,15 @@ export async function callAuthed<T>(
  *
  * Nơi gọi chịu trách nhiệm đọc/forward body của Response (vd
  * `new Response(res.body, { headers })`) và copy đúng header cần thiết
- * (Content-Disposition, Content-Type).
- *
- * Nếu `init.body` là ReadableStream thì KHÔNG retry sau 401 (stream chỉ
- * đọc được 1 lần) — xem withAuthRetry().
+ * (Content-Disposition, Content-Type). Vì không còn retry nên body dạng stream
+ * không còn là trường hợp đặc biệt.
  */
 export async function callAuthedStream(
   path: string,
   init: RequestInit = {},
 ): Promise<Response> {
-  const isStreamBody =
-    typeof ReadableStream !== "undefined" && init.body instanceof ReadableStream;
-  return withAuthRetry((token) => fetchOk(path, init, token), {
-    canRetry: !isStreamBody,
-  });
+  const token = await getSessionToken();
+  return fetchOk(path, init, token ?? undefined);
 }
 
 /** Dùng cho các route KHÔNG cần auth nhưng vẫn cần X-API-Key (vd GET /sources,

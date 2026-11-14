@@ -109,9 +109,8 @@ export interface UploadImportOptions {
  * (KHÔNG `await request.formData()` rồi dựng lại — tốn bộ nhớ và dễ chạm
  * giới hạn body của Vercel). Với body stream:
  *   - bắt buộc `duplex: "half"` (đã đặt sẵn ở đây);
- *   - KHÔNG retry sau 401 (stream chỉ đọc được 1 lần, xem callAuthedStream) —
- *     token đã được refresh chủ động trước lời gọi nên 401 rất hiếm; nếu có,
- *     lỗi lan lên và UI báo người dùng thử lại.
+ *   - không có retry nào sau 401 (callAuthedStream gửi đúng 1 lần); lỗi lan lên
+ *     nơi gọi và UI báo người dùng.
  *
  * Lỗi cần chú ý (đều là ApiError):
  *   - 400 import_file_format_unsupported / import_file_row_limit_exceeded (5000 dòng);

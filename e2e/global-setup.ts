@@ -42,7 +42,8 @@ export default async function globalSetup() {
     );
   }
 
-  const { access_token: token } = await api("/auth/login", {
+  // Session token mờ (Mục 3): backend vẫn chấp nhận Bearer của nó như mọi route cần đăng nhập.
+  const { session_token: token } = await api("/auth/login", {
     method: "POST",
     body: JSON.stringify({ email: ACCOUNTS.seedAdmin.email, password: PASSWORD }),
   });

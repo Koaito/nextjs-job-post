@@ -1,8 +1,8 @@
 // lib/api/auth.ts
 // Các hàm gọi thẳng route /auth/* của Scrap_JD.
 //
-// LƯU Ý: login() và refresh() KHÔNG đi qua callAuthed() (vì bản thân
-// chúng là nơi LẤY token, không phải nơi CẦN token có sẵn) — 2 hàm này
+// LƯU Ý: login() và getMe() KHÔNG đi qua callAuthed(): login là nơi LẤY token,
+// còn getMe() nhận token từ nơi gọi (lib/session.ts::getSessionState) — cả hai
 // dùng thẳng fetch để tránh vòng lặp phụ thuộc với lib/session.ts.
 
 import { ApiError, callAuthed } from "@/lib/api/client";
@@ -16,11 +16,21 @@ import { getClientIpHeaders } from "@/lib/client-ip-server";
  */
 export type BackendUser = components["schemas"]["UserOut"] & { is_staff: boolean };
 
-/** Response của POST /auth/login (TokenPairOut, có must_change_password). */
+/** Response của POST /auth/login (TokenPairOut): cặp access/refresh cũ (giữ cho client cũ, frontend KHÔNG
+ *  dùng và KHÔNG lưu) + `session_token`/`session_expires_at` của Mục 3. */
 export type TokenPair = components["schemas"]["TokenPairOut"];
 
-/** Response của POST /auth/refresh (AccessTokenOut): KHÔNG có must_change_password như TokenPairOut. */
-export type RefreshResult = components["schemas"]["AccessTokenOut"];
+/** Kết quả đăng nhập mà frontend cần: session token (cho cookie), hạn tuyệt đối, và cờ đổi mật khẩu. */
+export interface LoginResult {
+  sessionToken: string;
+  sessionExpiresAt: string | null;
+  mustChangePassword: boolean;
+}
+
+// Session token phải là chuỗi ASCII in được, không khoảng trắng/dấu ngoặc kép/chấm phẩy/dấu phẩy/
+// gạch chéo ngược: nó đi thẳng vào Set-Cookie và header Authorization. Token thật của backend
+// (`s1.` + base64url) luôn thoả; kiểm ở đây để một phản hồi hỏng không thành cookie hỏng.
+const SESSION_TOKEN_RE = /^[\x21\x23-\x2b\x2d-\x3a\x3c-\x5b\x5d-\x7e]{1,512}$/;
 
 const BASE_URL = process.env.CRAWLER_API_URL;
 const API_KEY = process.env.CRAWLER_API_KEY;
@@ -60,23 +70,36 @@ async function authRawFetch<T>(path: string, init: RequestInit): Promise<T> {
   return res.json();
 }
 
-export const login = (email: string, password: string) =>
-  authRawFetch<TokenPair>("/auth/login", {
+/**
+ * POST /auth/login -> session token mờ (một giá trị) thay cho cặp access/refresh.
+ *
+ * Backend chưa cập nhật Pha A (không có `session_token`) hoặc trả token hỏng -> ném ApiError 502
+ * mã `auth_session_unsupported`, KHÔNG ghi cookie rác. Đây là lỗi triển khai (thứ tự: backend
+ * lên trước), không phải lỗi của người dùng.
+ */
+export async function login(email: string, password: string): Promise<LoginResult> {
+  const res = await authRawFetch<TokenPair>("/auth/login", {
     method: "POST",
     body: JSON.stringify({ email, password }),
   });
 
-/**
- * Xoay vòng refresh token — LUÔN nhận lại 1 CẶP token mới. Backend thu
- * hồi token cũ ngay khi hàm này chạy, nên hàm này KHÔNG được gọi trùng
- * lặp cho cùng 1 refresh token trong cùng 1 request (xem lib/session.ts
- * — getValidAccessToken() đã bọc React.cache() để đảm bảo điều này).
- */
-export const refresh = (refreshToken: string) =>
-  authRawFetch<RefreshResult>("/auth/refresh", {
-    method: "POST",
-    body: JSON.stringify({ refresh_token: refreshToken }),
-  });
+  const token = res.session_token;
+  if (typeof token !== "string" || !SESSION_TOKEN_RE.test(token)) {
+    // Không log `res`: nó chứa access/refresh token.
+    console.error("[auth] /auth/login không trả session_token hợp lệ — backend đã triển khai Pha A chưa?");
+    throw new ApiError(
+      "Máy chủ xác thực chưa sẵn sàng, vui lòng thử lại sau.",
+      502,
+      "auth_session_unsupported",
+    );
+  }
+
+  return {
+    sessionToken: token,
+    sessionExpiresAt: res.session_expires_at ?? null,
+    mustChangePassword: res.must_change_password ?? false,
+  };
+}
 
 /**
  * GET /auth/me — backend trả UserOut (KHÔNG có field `is_staff`, xem
@@ -85,9 +108,9 @@ export const refresh = (refreshToken: string) =>
  * handlers...) dựa vào is_staff đã tính sẵn này, không tự suy lại
  * `role !== "user"` rải rác nhiều chỗ.
  */
-export const getMe = async (accessToken: string): Promise<BackendUser> => {
+export const getMe = async (sessionToken: string): Promise<BackendUser> => {
   const user = await authRawFetch<components["schemas"]["UserOut"]>("/auth/me", {
-    headers: { Authorization: `Bearer ${accessToken}` },
+    headers: { Authorization: `Bearer ${sessionToken}` },
   });
   return { ...user, is_staff: user.role !== "user" };
 };
@@ -105,16 +128,21 @@ export const updateMe = (data: { full_name: string; phone?: string; track?: stri
     body: JSON.stringify(data),
   });
 
+/**
+ * POST /auth/logout — thu hồi ĐÚNG phiên hiện tại. Backend nhận session token qua header
+ * Authorization (callAuthed gắn từ cookie), KHÔNG cần body. Không lỗi nếu phiên đã bị thu
+ * hồi trước đó; nơi gọi (app/api/auth/logout/route.ts) vẫn xoá cookie dù hàm này ném lỗi.
+ */
 export const logout = () => callAuthed<void>("/auth/logout", { method: "POST" });
 
 /**
- * POST /auth/change-password — CẦN auth (đi qua callAuthed, tự refresh
- * token nếu cần). `old_password` chỉ optional khi must_change_password
+ * POST /auth/change-password — CẦN auth (đi qua callAuthed, session token
+ * lấy từ cookie). `old_password` chỉ optional khi must_change_password
  * đang true (Route Handler không tự đoán trước, để backend quyết định
  * và trả lỗi `AUTH_OLD_PASSWORD_INCORRECT` (401) nếu thiếu/sai khi thật
  * ra bắt buộc — xem api/routers/auth_session.py::change_password() bên
- * Scrap_JD). Backend tự thu hồi TOÀN BỘ refresh token + clear
- * active_session_id sau khi đổi thành công — Route Handler gọi hàm này
+ * Scrap_JD). Backend tự thu hồi TOÀN BỘ phiên của tài khoản (kể cả phiên
+ * hiện tại) sau khi đổi thành công — Route Handler gọi hàm này
  * (app/api/auth/change-password/route.ts) có trách nhiệm tự xoá cookie
  * phiên NGAY sau khi gọi thành công, không đợi request kế tiếp tự phát
  * hiện phiên đã chết.

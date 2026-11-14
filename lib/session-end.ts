@@ -11,12 +11,11 @@
 //   hằng số backend                       -> giá trị chuỗi thật
 //   SESSION_REPLACED                      -> session_replaced
 //   SESSION_REVOKED                       -> session_revoked
-//   AUTH_REFRESH_TOKEN_ALREADY_REVOKED    -> auth_refresh_token_thu_hoi_truoc
 //
-// 2 mã còn lại của refresh (AUTH_REFRESH_TOKEN_EXPIRED = auth_expired_2,
-// AUTH_REFRESH_TOKEN_INVALID = auth_invalid_2) cố ý KHÔNG nằm ở đây: hết
-// hạn 30 ngày là chuyện bình thường, chỉ cần quay về /login lặng lẽ, không
-// cần thông báo gì.
+// Mục 3 (session mờ): frontend không còn gọi /auth/refresh nên mã
+// auth_refresh_token_thu_hoi_truoc (và auth_expired_2 / auth_invalid_2) không còn đường nào
+// tới đây. Hết hạn thường (token_expired: quá hạn tuyệt đối hoặc nhàn rỗi quá hạn trượt)
+// cố ý KHÔNG nằm ở đây: chuyện bình thường, chỉ cần quay về /login lặng lẽ.
 
 /** replaced = bị đăng nhập ở nơi khác thay thế (dấu hiệu có thể bị chiếm
  *  tài khoản); revoked = phiên bị thu hồi do chính chủ đăng xuất/đổi mật
@@ -25,7 +24,6 @@ export type SessionEndReason = "replaced" | "revoked";
 
 const CODE_TO_REASON: Record<string, SessionEndReason> = {
   session_replaced: "replaced",
-  auth_refresh_token_thu_hoi_truoc: "replaced",
   session_revoked: "revoked",
 };
 

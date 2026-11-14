@@ -36,7 +36,9 @@ export async function login(page: Page, email: string) {
 export const SEED_JOB_COUNT = 23;
 export const DATA_JOB_TITLE = "E2E Data Analyst Intern";
 
-export const SESSION_COOKIES = ["mx_access", "mx_refresh"];
+// Cookie phiên duy nhất (Mục 3, Pha B). Hai cookie cũ chỉ còn để kiểm proxy dọn chúng.
+export const SESSION_COOKIES = ["mx_session"];
+export const LEGACY_SESSION_COOKIES = ["mx_access", "mx_refresh"];
 
 // ---------------------------------------------------------------------------------------------------------
 // IP khách riêng cho từng test.

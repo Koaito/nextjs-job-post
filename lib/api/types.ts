@@ -1165,10 +1165,20 @@ export interface paths {
         put?: never;
         /**
          * Logout
-         * @description Đăng xuất — thu hồi ĐÚNG refresh token gửi lên (không đụng tới
-         *     token của thiết bị khác). Không lỗi nếu token không tồn tại/đã thu
-         *     hồi từ trước (đăng xuất nhiều lần vẫn coi là thành công, tránh lộ
-         *     thông tin qua khác biệt response).
+         * @description Đăng xuất. Nhận HAI loại credential (Mục 3, Pha A), có thể gửi cả hai:
+         *
+         *     1. SESSION TOKEN mờ trong header `Authorization: Bearer s1....` (đường của frontend mới): thu hồi đúng
+         *        phiên đó (lý do 'logout'), đồng thời cho JWT + refresh token CÙNG LẦN ĐĂNG NHẬP chết theo (xoá
+         *        active_session_id nếu nó vẫn trỏ vào phiên này, thu hồi refresh token) — nếu không, refresh token
+         *        đã phát lúc đăng nhập sẽ còn dùng được để "hồi sinh" phiên sau khi đã đăng xuất. Không đụng phiên mới
+         *        hơn nếu người dùng đã đăng nhập lại ở nơi khác giữa chừng (khi đó phiên này đã bị thu hồi từ trước).
+         *     2. `refresh_token` trong body (đường cũ): hành vi như trước — thu hồi đúng refresh token đó, xoá
+         *        active_session_id; thêm: thu hồi mọi session mờ còn hiệu lực của người dùng đó (cùng một lần đăng nhập
+         *        nên phải chết cùng).
+         *
+         *     Không lỗi nếu credential không tồn tại/đã thu hồi từ trước, hoặc không gửi gì cả (đăng xuất nhiều lần vẫn
+         *     coi là thành công, tránh lộ thông tin qua khác biệt response). Header Authorization mang JWT (không phải
+         *     session token) bị bỏ qua, vì JWT không có cách thu hồi riêng lẻ ngoài active_session_id.
          */
         post: operations["logout_auth_logout_post"];
         delete?: never;
@@ -4087,6 +4097,16 @@ export interface components {
             /** Password */
             password: string;
         };
+        /**
+         * LogoutRequest
+         * @description Body (TUỲ CHỌN) cho POST /auth/logout. Client dùng session token mới (Mục 3) chỉ cần gửi header
+         *     `Authorization: Bearer <session_token>`, không cần body. Client cũ gửi `refresh_token` như trước vẫn chạy.
+         *     Gửi cả hai thì xử lý cả hai.
+         */
+        LogoutRequest: {
+            /** Refresh Token */
+            refresh_token?: string | null;
+        };
         /** MaintenanceAccepted */
         MaintenanceAccepted: {
             /** Run Id */
@@ -4736,6 +4756,13 @@ export interface components {
              * @default false
              */
             must_change_password: boolean;
+            /** Session Token */
+            session_token: string;
+            /**
+             * Session Expires At
+             * Format: date-time
+             */
+            session_expires_at: string;
         };
         /** TopCompanyRow */
         TopCompanyRow: {
@@ -6345,9 +6372,9 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody: {
+        requestBody?: {
             content: {
-                "application/json": components["schemas"]["RefreshRequest"];
+                "application/json": components["schemas"]["LogoutRequest"] | null;
             };
         };
         responses: {

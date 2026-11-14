@@ -13,8 +13,8 @@
 // cần login tự gọi requireUser()/requireStaff().
 //
 // Fetch ngay trong layout (getSessionState + danh sách job đã lưu) — an
-// toàn với Phụ lục A của plan vì cả 2 đều đi qua getValidAccessToken()
-// đã bọc React.cache(): trong 1 lần render chỉ tối đa 1 lần /auth/refresh.
+// toàn khi chạy song song vì session token không xoay vòng (Mục 3): nhiều
+// lời gọi cùng dùng một token mà không tranh chấp gì.
 //
 // LỆCH CÓ CHỦ ĐÍCH so với plan dòng 945 (script inline chống FOUC cho
 // sidebar): shadcn SidebarProvider tự ghi cookie `sidebar_state` mỗi lần

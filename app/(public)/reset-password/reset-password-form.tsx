@@ -41,8 +41,8 @@ export function ResetPasswordForm({ token }: { token: string }) {
     }
   }
 
-  // Thành công: backend đã tự thu hồi toàn bộ refresh token + clear
-  // active_session_id (single-session) của user đó — không tự đăng
+  // Thành công: backend đã tự thu hồi toàn bộ phiên (single-session)
+  // của user đó — không tự đăng
   // nhập lại ở đây, bắt người dùng chủ động nhập mật khẩu MỚI ở /login
   // để chắc chắn họ nhớ đúng mật khẩu vừa đổi.
   if (success) {

@@ -7,7 +7,7 @@
 // (api/routers/auth_session.py::change_password()).
 //
 // Thành công -> Route Handler đã tự xoá cookie phiên (backend thu hồi
-// toàn bộ refresh token + clear active_session_id) -> redirect thẳng
+// toàn bộ phiên của tài khoản) -> redirect thẳng
 // /login, KHÔNG giữ phiên hiện tại (đúng yêu cầu Nhóm 5).
 
 import { useState } from "react";

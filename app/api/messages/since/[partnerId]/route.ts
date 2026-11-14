@@ -23,7 +23,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ApiError } from "@/lib/api/client";
 import { getMessagesSince } from "@/lib/api/messages";
-import { getTokens } from "@/lib/session";
+import { getSessionToken } from "@/lib/session";
 import { isUuid, toChatMessageView } from "@/lib/messages";
 
 // Không bao giờ cache — tin mới đến từng giây.
@@ -43,9 +43,8 @@ export async function GET(
   req: NextRequest,
   ctx: { params: Promise<{ partnerId: string }> },
 ) {
-  // Khách hoàn toàn (không có cả 2 cookie) -> 401 luôn, khỏi gọi backend vô ích.
-  const { accessToken, refreshToken } = await getTokens();
-  if (!accessToken && !refreshToken) {
+  // Khách hoàn toàn (không có cookie phiên) -> 401 luôn, khỏi gọi backend vô ích.
+  if (!(await getSessionToken())) {
     return NextResponse.json({ ok: false }, { status: 401, headers: NO_STORE });
   }
 

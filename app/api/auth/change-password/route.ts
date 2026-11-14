@@ -6,7 +6,7 @@
 // Server Action) cho MỌI route auth cần set/xoá cookie phiên.
 //
 // Khác 4 route auth công khai kia (register/resend/forgot/reset):
-// route này CẦN đăng nhập (dựa vào cookie mx_access qua callAuthed(),
+// route này CẦN đăng nhập (dựa vào cookie mx_session qua callAuthed(),
 // xem lib/api/auth.ts::changePassword()) nên bắt buộc verifyOrigin().
 //
 // old_password chỉ optional khi must_change_password đang true (tài
@@ -17,16 +17,16 @@
 // Scrap_JD) — đúng nguyên tắc Phụ lục D: rẽ nhánh lỗi bằng error_code,
 // không tự suy luận nghiệp vụ ở tầng BFF.
 //
-// Đổi mật khẩu thành công -> backend đã tự thu hồi TOÀN BỘ refresh
-// token + clear active_session_id (kể cả phiên hiện tại). Route Handler
-// PHẢI tự xoá cookie mx_access/mx_refresh ngay tại đây (không đợi
+// Đổi mật khẩu thành công -> backend đã tự thu hồi TOÀN BỘ phiên của
+// tài khoản (kể cả phiên hiện tại). Route Handler
+// PHẢI tự xoá cookie mx_session ngay tại đây (không đợi
 // request kế tiếp mới phát hiện phiên đã chết) — khớp yêu cầu Nhóm 5:
 // "Đổi mật khẩu thành công -> logout hoàn toàn + redirect /login,
 // không giữ phiên hiện tại".
 
 import { NextRequest, NextResponse } from "next/server";
 import { changePassword } from "@/lib/api/auth";
-import { clearAuthCookies } from "@/lib/session";
+import { clearSessionCookie } from "@/lib/session";
 import { ApiError } from "@/lib/api/client";
 import { verifyOrigin } from "@/lib/verify-origin";
 
@@ -62,8 +62,8 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     if (err instanceof ApiError) {
       // 401 + error_code=AUTH_OLD_PASSWORD_INCORRECT (sai/thiếu mật
-      // khẩu cũ) hoặc 401 thường (phiên hết hạn hẳn, callAuthed refresh
-      // phản ứng cũng thất bại) — cả 2 đều trả nguyên message/errorCode
+      // khẩu cũ) hoặc 401 thường (phiên hết hạn/bị thu hồi) — cả 2 đều
+      // trả nguyên message/errorCode
       // backend, không tự viết lại (Phụ lục D).
       return NextResponse.json(
         { ok: false, message: err.message, errorCode: err.errorCode },
@@ -76,6 +76,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  await clearAuthCookies();
+  await clearSessionCookie();
   return NextResponse.json({ ok: true });
 }

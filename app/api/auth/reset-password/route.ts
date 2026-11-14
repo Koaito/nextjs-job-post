@@ -3,8 +3,8 @@
 // sang Route Handler theo plan (Phần 2 mục 1). Khớp reset_password()
 // bên backend: token dùng đúng 1 lần, sai/hết hạn phân biệt qua
 // `error_code` (AUTH_INVALID/AUTH_EXPIRED — Phụ lục D, không suy luận
-// từ message). Thành công thì backend đã tự thu hồi toàn bộ refresh
-// token + clear active_session_id của user đó — Route Handler này
+// từ message). Thành công thì backend đã tự thu hồi toàn bộ phiên
+// của user đó — Route Handler này
 // không cần tự làm gì thêm ngoài báo thành công (không tự đăng nhập
 // lại, người dùng phải nhập mật khẩu mới ở /login).
 

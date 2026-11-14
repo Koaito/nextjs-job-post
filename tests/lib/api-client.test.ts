@@ -1,23 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // client.ts phụ thuộc lib/session (cookies của Next) và client-ip-server
-// (headers của Next) -> mock cả hai. forceRefreshWithReason/getValidAccessToken
-// ở đây là giả: test này kiểm tra LOGIC RETRY của client.ts, không kiểm tra
-// refresh thật (cache() dedupe nằm trong lib/session.ts, chưa có test).
+// (headers của Next) -> mock cả hai. getSessionToken ở đây là giả; đọc cookie thật
+// được test ở tests/lib/session.test.ts. Mục 3 (session mờ): callAuthed gửi ĐÚNG MỘT LẦN,
+// không refresh, không thử lại — nhóm test "không retry" bên dưới khoá điều đó.
 vi.mock("@/lib/session", () => ({
-  getValidAccessToken: vi.fn(),
-  forceRefreshWithReason: vi.fn(),
+  getSessionToken: vi.fn(),
 }));
 vi.mock("@/lib/client-ip-server", () => ({
   getClientIpHeaders: vi.fn(),
 }));
 
-import { forceRefreshWithReason, getValidAccessToken } from "@/lib/session";
+import { getSessionToken } from "@/lib/session";
 import { getClientIpHeaders } from "@/lib/client-ip-server";
 import { ApiError, callAuthed, callAuthedStream, callPublic } from "@/lib/api/client";
 
-const mockGetToken = vi.mocked(getValidAccessToken);
-const mockForceRefresh = vi.mocked(forceRefreshWithReason);
+const mockGetToken = vi.mocked(getSessionToken);
 const mockClientIp = vi.mocked(getClientIpHeaders);
 
 const API_URL = "https://api.test";
@@ -65,7 +63,6 @@ beforeEach(() => {
   vi.stubEnv("CRAWLER_API_URL", API_URL);
   vi.stubEnv("CRAWLER_API_KEY", "key-xyz");
   mockGetToken.mockResolvedValue("tok-1");
-  mockForceRefresh.mockResolvedValue({ token: null });
   mockClientIp.mockResolvedValue({});
   // Lỗi dạng 3 gọi console.error để ghi log; giữ output test sạch.
   vi.spyOn(console, "error").mockImplementation(() => {});
@@ -85,7 +82,7 @@ describe("ApiError", () => {
 });
 
 describe("callAuthed — request gửi đi", () => {
-  it("gắn X-API-Key, Bearer token, Content-Type JSON; nối CRAWLER_API_URL + path", async () => {
+  it("gắn X-API-Key, Bearer session token, Content-Type JSON; nối CRAWLER_API_URL + path", async () => {
     const fetchMock = stubFetch(jsonRes({ ok: 1 }));
     const out = await callAuthed<{ ok: number }>("/jobs?page=1");
     expect(out).toEqual({ ok: 1 });
@@ -98,7 +95,7 @@ describe("callAuthed — request gửi đi", () => {
     expect(init.cache).toBe("no-store");
   });
 
-  it("không có access token -> không gửi Authorization", async () => {
+  it("không có session token -> không gửi Authorization", async () => {
     mockGetToken.mockResolvedValue(null);
     const fetchMock = stubFetch(jsonRes({}));
     await callAuthed("/x");
@@ -225,39 +222,15 @@ describe("callAuthed — chuẩn hoá lỗi (3 dạng detail của FastAPI)", ()
     expect(msg.length).toBeLessThan(400);
   });
 
-  it("lỗi mạng (fetch ném) lan thẳng, không bọc thành ApiError và không refresh", async () => {
-    stubFetch(new TypeError("fetch failed"));
+  it("lỗi mạng (fetch ném) lan thẳng, không bọc thành ApiError và không gửi lại", async () => {
+    const fetchMock = stubFetch(new TypeError("fetch failed"));
     await expect(callAuthed("/x")).rejects.toThrow("fetch failed");
-    expect(mockForceRefresh).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
 
-describe("callAuthed — refresh phản ứng khi 401", () => {
-  it("401 rồi refresh OK -> gọi lại ĐÚNG 1 lần với token mới", async () => {
-    mockForceRefresh.mockResolvedValue({ token: "tok-2" });
-    const fetchMock = stubFetch(errRes({ error_code: "token_expired", message: "hết hạn" }, 401), jsonRes({ ok: 1 }));
-    await expect(callAuthed("/x")).resolves.toEqual({ ok: 1 });
-    expect(mockForceRefresh).toHaveBeenCalledTimes(1);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(call(fetchMock, 0).headers["Authorization"]).toBe("Bearer tok-1");
-    expect(call(fetchMock, 1).headers["Authorization"]).toBe("Bearer tok-2");
-  });
-
-  it("401 lần 2 sau khi refresh -> KHÔNG lặp vô hạn: 2 lần fetch, 1 lần refresh, ném lỗi", async () => {
-    mockForceRefresh.mockResolvedValue({ token: "tok-2" });
-    const fetchMock = stubFetch(
-      errRes({ error_code: "token_expired", message: "a" }, 401),
-      errRes({ error_code: "token_expired", message: "b" }, 401),
-    );
-    const err = await rejectionOf(callAuthed("/x"));
-    expect(err).toBeInstanceOf(ApiError);
-    expect(err.status).toBe(401);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(mockForceRefresh).toHaveBeenCalledTimes(1);
-  });
-
-  it("refresh thất bại không rõ lý do -> ném 401 gốc (giữ error_code gốc)", async () => {
-    mockForceRefresh.mockResolvedValue({ token: null });
+describe("callAuthed — không retry (session mờ, Mục 3)", () => {
+  it("401 token_expired -> gửi ĐÚNG 1 lần, ném ApiError 401 giữ error_code", async () => {
     const fetchMock = stubFetch(errRes({ error_code: "token_expired", message: "hết hạn" }, 401));
     const err = await rejectionOf(callAuthed("/x"));
     expect(err.status).toBe(401);
@@ -265,62 +238,36 @@ describe("callAuthed — refresh phản ứng khi 401", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("refresh thất bại vì lý do CẦN BÁO (session_replaced) -> ném 401 mang error_code của refresh", async () => {
-    mockForceRefresh.mockResolvedValue({ token: null, errorCode: "session_replaced" });
-    stubFetch(errRes({ error_code: "token_expired", message: "hết hạn" }, 401));
-    const err = await rejectionOf(callAuthed("/x"));
-    expect(err).toBeInstanceOf(ApiError);
-    expect(err.status).toBe(401);
-    expect(err.errorCode).toBe("session_replaced");
-    expect(err.message).toBe("hết hạn");
-  });
-
-  it.each(["session_revoked", "auth_refresh_token_thu_hoi_truoc"])(
-    "refresh thất bại với %s cũng được chuyển lên",
+  it.each(["session_replaced", "session_revoked"])(
+    "401 %s lan nguyên mã lên nơi gọi (để rẽ nhánh thông báo), không gửi lại",
     async (code) => {
-      mockForceRefresh.mockResolvedValue({ token: null, errorCode: code });
-      stubFetch(errRes({ error_code: "token_expired", message: "x" }, 401));
+      const fetchMock = stubFetch(errRes({ error_code: code, message: "x" }, 401));
       const err = await rejectionOf(callAuthed("/x"));
+      expect(err.status).toBe(401);
       expect(err.errorCode).toBe(code);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
     },
   );
 
-  it("refresh thất bại vì hết hạn thường (auth_expired_2) -> giữ error_code gốc, không báo", async () => {
-    mockForceRefresh.mockResolvedValue({ token: null, errorCode: "auth_expired_2" });
-    stubFetch(errRes({ error_code: "token_expired", message: "x" }, 401));
-    const err = await rejectionOf(callAuthed("/x"));
-    expect(err.errorCode).toBe("token_expired");
-  });
-
-  it.each([400, 403, 404, 429, 500, 503])("status %i KHÔNG kích hoạt refresh", async (status) => {
-    stubFetch(errRes({ error_code: "x", message: "y" }, status));
+  it.each([400, 401, 403, 404, 429, 500, 503])("status %i: chỉ 1 lần fetch", async (status) => {
+    const fetchMock = stubFetch(errRes({ error_code: "x", message: "y" }, status));
     await callAuthed("/x").catch(() => {});
-    expect(mockForceRefresh).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("ca 401 ở lệnh THỨ 2 trong cùng một lượt: lệnh 1 không bị gọi lại, lệnh 2 refresh rồi chạy lại", async () => {
-    mockForceRefresh.mockResolvedValue({ token: "tok-2" });
-    const fetchMock = stubFetch(
-      jsonRes({ n: 1 }), // lệnh 1: OK với tok-1
-      errRes({ error_code: "token_expired", message: "x" }, 401), // lệnh 2: 401
-      jsonRes({ n: 2 }), // lệnh 2 retry với tok-2
-    );
-    await expect(callAuthed("/a")).resolves.toEqual({ n: 1 });
-    await expect(callAuthed("/b")).resolves.toEqual({ n: 2 });
-
-    expect(fetchMock).toHaveBeenCalledTimes(3);
-    expect(call(fetchMock, 0).url).toBe(`${API_URL}/a`);
-    expect(call(fetchMock, 1).url).toBe(`${API_URL}/b`);
-    expect(call(fetchMock, 2).url).toBe(`${API_URL}/b`);
-    expect(call(fetchMock, 2).headers["Authorization"]).toBe("Bearer tok-2");
-    expect(mockForceRefresh).toHaveBeenCalledTimes(1);
-  });
-
-  it("mỗi lệnh gọi getValidAccessToken() đúng 1 lần (kể cả khi retry)", async () => {
-    mockForceRefresh.mockResolvedValue({ token: "tok-2" });
-    stubFetch(errRes({ error_code: "token_expired", message: "x" }, 401), jsonRes({}));
-    await callAuthed("/x");
+  it("đọc session token đúng 1 lần cho mỗi lời gọi", async () => {
+    stubFetch(errRes({ error_code: "session_revoked", message: "x" }, 401));
+    await callAuthed("/x").catch(() => {});
     expect(mockGetToken).toHaveBeenCalledTimes(1);
+  });
+
+  it("nhiều lời gọi song song cùng dùng MỘT token, không ai tranh chấp hay gọi thêm", async () => {
+    const fetchMock = vi.fn();
+    for (let i = 0; i < 10; i++) fetchMock.mockResolvedValueOnce(jsonRes({ n: i }));
+    vi.stubGlobal("fetch", fetchMock);
+    await Promise.all(Array.from({ length: 10 }, (_, i) => callAuthed(`/p${i}`)));
+    expect(fetchMock).toHaveBeenCalledTimes(10);
+    for (let i = 0; i < 10; i++) expect(call(fetchMock, i).headers["Authorization"]).toBe("Bearer tok-1");
   });
 });
 
@@ -350,19 +297,15 @@ describe("callAuthedStream", () => {
     expect(err.errorCode).toBe("import_preview_expired");
   });
 
-  it("body thường (không phải stream) + 401 -> vẫn retry sau refresh", async () => {
-    mockForceRefresh.mockResolvedValue({ token: "tok-2" });
-    const fetchMock = stubFetch(
-      errRes({ error_code: "token_expired", message: "x" }, 401),
-      new Response("file", { status: 200 }),
-    );
-    const res = await callAuthedStream("/export/job", { method: "GET" });
-    expect(await res.text()).toBe("file");
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(call(fetchMock, 1).headers["Authorization"]).toBe("Bearer tok-2");
+  it("body thường + 401 -> ném ApiError, chỉ 1 lần fetch (không còn retry)", async () => {
+    const fetchMock = stubFetch(errRes({ error_code: "session_revoked", message: "x" }, 401));
+    const err = await rejectionOf(callAuthedStream("/export/job", { method: "GET" }));
+    expect(err.status).toBe(401);
+    expect(err.errorCode).toBe("session_revoked");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("body ReadableStream + 401 -> KHÔNG refresh, KHÔNG gọi lại (stream chỉ đọc được 1 lần)", async () => {
+  it("body ReadableStream + 401 -> ném lỗi, chỉ 1 lần fetch", async () => {
     const fetchMock = stubFetch(errRes({ error_code: "token_expired", message: "x" }, 401));
     const body = new ReadableStream({
       start(c) {
@@ -373,11 +316,10 @@ describe("callAuthedStream", () => {
     const err = await rejectionOf(callAuthedStream("/import/preview", { method: "POST", body }));
     expect(err).toBeInstanceOf(ApiError);
     expect(err.status).toBe(401);
-    expect(mockForceRefresh).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("body ReadableStream + thành công -> gửi 1 lần với token chủ động", async () => {
+  it("body ReadableStream + thành công -> gửi 1 lần với session token", async () => {
     const fetchMock = stubFetch(jsonRes({ preview_id: "p1" }));
     const body = new ReadableStream({
       start(c) {
@@ -401,10 +343,10 @@ describe("callPublic", () => {
     expect(headers["Authorization"]).toBeUndefined();
   });
 
-  it("401 không kích hoạt refresh (route công khai)", async () => {
-    stubFetch(errRes({ error_code: "x", message: "y" }, 401));
+  it("401 chỉ ném lỗi, 1 lần fetch (route công khai)", async () => {
+    const fetchMock = stubFetch(errRes({ error_code: "x", message: "y" }, 401));
     await callPublic("/sources").catch(() => {});
-    expect(mockForceRefresh).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("lỗi chuẩn hoá thành ApiError", async () => {

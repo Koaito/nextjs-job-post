@@ -191,7 +191,7 @@ export type SendMessageResult =
  *
  * LỆCH SO VỚI PLAN (đã báo trong ghi chú giao việc): plan bảo phân biệt bằng
  * HTTP status, nhưng callAuthed() chỉ trả body JSON, không lộ status, và plan
- * cấm viết lại logic refresh ngoài callAuthed. Thay vào đó dùng field `kind`
+ * cấm viết lại logic gọi API có auth ngoài callAuthed. Thay vào đó dùng field `kind`
  * mà backend đã thêm đúng cho mục đích này (plan 3.15; xác nhận trong
  * api/routers/messages.py: cả 201 lẫn 202 đều mang `kind`). Vẫn rẽ nhánh theo
  * `kind` tường minh, KHÔNG đoán theo "có field id hay không" khi `kind` có mặt;

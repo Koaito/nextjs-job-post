@@ -1,5 +1,5 @@
 // lib/verify-origin.ts
-// Thay CSRF token kiểu Flask-WTF. Cookie mx_access/mx_refresh vẫn tự
+// Thay CSRF token kiểu Flask-WTF. Cookie mx_session vẫn tự
 // động gửi kèm request tới domain Next.js -> vẫn có rủi ro CSRF tương
 // tự Flask, không phải "vì gọi API riêng nên hết cần lo".
 //

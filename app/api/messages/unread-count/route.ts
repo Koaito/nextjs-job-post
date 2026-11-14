@@ -12,14 +12,12 @@
 //   2. Tự set Cache-Control: no-store trên response CỦA CHÍNH route này
 //      (không dựa vào header backend — đó là header của lời gọi
 //      server-to-server, không phải của response trả về trình duyệt).
-//   3. Không rơi vào lỗi "Cookies can only be modified in a Server
-//      Component": Route Handler ĐƯỢC phép set cookie, nên nhánh refresh
-//      phản ứng của callAuthed() (forceRefreshAccessToken) chạy được ở
-//      đây — khác khi gọi từ layout (Server Component).
+//   3. Không đụng cookie: session token không xoay vòng nên không có gì
+//      để ghi lại; cookie chết do client dọn (lib/session-end-client.ts).
 
 import { NextResponse } from "next/server";
 import { ApiError, callAuthed } from "@/lib/api/client";
-import { getTokens } from "@/lib/session";
+import { getSessionToken } from "@/lib/session";
 import type { components } from "@/lib/api/types";
 
 type UnreadCountOut = components["schemas"]["UnreadCountOut"];
@@ -30,10 +28,9 @@ export const dynamic = "force-dynamic";
 const NO_STORE = { "Cache-Control": "no-store" } as const;
 
 export async function GET() {
-  // Khách hoàn toàn (không có cả 2 cookie) -> trả 401 luôn, khỏi gọi
+  // Khách hoàn toàn (không có cookie phiên) -> trả 401 luôn, khỏi gọi
   // backend vô ích chỉ để nhận lại đúng 401.
-  const { accessToken, refreshToken } = await getTokens();
-  if (!accessToken && !refreshToken) {
+  if (!(await getSessionToken())) {
     return NextResponse.json({ ok: false }, { status: 401, headers: NO_STORE });
   }
 

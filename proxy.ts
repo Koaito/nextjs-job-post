@@ -1,229 +1,45 @@
 // proxy.ts
-// (Đổi tên từ middleware.ts theo Next.js 16: convention "middleware" đã
-// deprecated, thay bằng "proxy" — hàm export đổi tên middleware -> proxy,
-// logic giữ nguyên. Proxy chạy Node.js runtime, KHÔNG còn là Edge. Các
-// comment bên dưới đã đổi "middleware" -> "proxy"; lịch sử các round cũ
-// ở chat237-239.txt vẫn dùng từ "middleware".)
-// ROUND SỬA REFRESH (chat237.txt phát hiện bug, chốt hướng ở
-// chat238.txt/chat239.txt) — thay cho bản cũ "chỉ chặn sớm theo cookie".
+// (Đổi tên từ middleware.ts theo Next.js 16: hàm export đổi tên middleware -> proxy.
+// Proxy chạy Node.js runtime, KHÔNG còn là Edge.)
 //
-// Bug của bản cũ (Hướng A — refresh chủ động chỉ nằm ở
-// lib/session.ts::getValidAccessToken(), chạy trong Server Component):
-// khi refresh xảy ra trong Server Component, cookie mới KHÔNG lưu được
-// (Server Component chỉ được set cookie trong Server Action/Route
-// Handler, không phải lúc render bình thường) -> request hiện tại vẫn
-// chạy OK (dùng token mới nằm trong bộ nhớ), nhưng trình duyệt vẫn giữ
-// refresh token CŨ đã bị backend thu hồi. Grace period 10s bên backend
-// (api/security.py::REFRESH_REUSE_GRACE_SECONDS) cứu được nếu request
-// kế tiếp đến trong 10 giây, nhưng user rời tab lâu hơn rồi quay lại sẽ
-// bị văng đăng xuất oan — và lỗi này tăng dần theo số Server Component
-// gọi song song (Round 6, Nhóm 2-6 sắp làm sẽ càng lộ rõ).
+// Mục 3 (session mờ lưu DB), Pha B: proxy KHÔNG còn refresh token và KHÔNG gọi backend.
+// Bản cũ (237 dòng) tự gọi /auth/refresh để ghi cookie mới trước mỗi render; session token
+// không hết hạn theo phút và không xoay vòng nên toàn bộ phần đó bỏ. Proxy chỉ còn 3 việc:
 //
-// Hướng B (chốt dùng): proxy — nơi DUY NHẤT chạy trước mọi render
-// VÀ được phép ghi cookie response — tự gọi /auth/refresh khi access
-// token hết hạn/sắp hết hạn, ghi lại cookie mới, trước khi cho request
-// đi tiếp. Vẫn giữ đúng tinh thần "refresh chỉ 1 nơi" của plan (chỉ đổi
-// vị trí từ lib/session.ts sang đây) — lib/session.ts::getValidAccessToken()
-// giữ nguyên logic cũ, trở thành lớp dự phòng hiếm khi chạy (proxy bị
-// skip do matcher, hoặc token hết hạn ngay giữa lúc render).
+//   1. Chặn SỚM route cần đăng nhập khi hoàn toàn thiếu cookie phiên (redirect /login?next=).
+//      Chỉ kiểm cookie CÓ MẶT, không kiểm hợp lệ: hợp lệ hay không do backend quyết định khi
+//      Server Component gọi (requireUser -> getSessionState). Cookie chết thì requireUser
+//      redirect /login kèm ?reason= (nếu là session_replaced/session_revoked).
+//   2. Gắn header `x-invoke-path` để lib/auth-guard.ts biết pathname hiện tại.
+//   3. Xoá 2 cookie cũ mx_access/mx_refresh nếu trình duyệt còn giữ (người dùng đăng nhập từ
+//      trước Pha B). Không tốn lời gọi mạng. Gỡ việc này ở Pha C.
 //
-// Proxy không dùng được next/headers (lib/session.ts import nó, chỉ hợp lệ
-// khi render Server Component/Route Handler), nên phần "decode JWT exp"
-// dùng chung qua lib/jwt.ts (không đụng next/headers), còn phần gọi
-// /auth/refresh gọi thẳng fetch() riêng ở đây (KHÔNG import lib/api/
-// auth.ts để proxy không kéo theo phụ thuộc vào ngữ cảnh render).
-//
-// Phạm vi áp dụng: MỌI route (kể cả /jobs, /jobs/[id] công khai) — route
-// public vẫn gọi getCurrentUser() ở layout để hiện nút "Thêm job"/"Lưu
-// job" cho khách đã đăng nhập, nên cũng cần access token được refresh sẵn
-// để không bị mất trạng thái đăng nhập khi ghé trang chủ (đối chiếu với
-// Flask: load_user() của Flask-Login chạy mọi request, kể cả route
-// public — xác nhận ở chat239.txt). Route public CHỈ khác route cần-login
-// ở chỗ không bị redirect /login khi hoàn toàn thiếu cookie.
+// Route công khai KHÔNG bao giờ bị redirect: /jobs, /jobs/[id] vẫn gọi getSessionState() ở
+// layout để hiện nút "Thêm job"/"Lưu job" cho khách đã đăng nhập; khách thì chỉ là không có cookie.
 
 import { NextRequest, NextResponse } from "next/server";
-import { isExpiredSoon } from "@/lib/jwt";
-import { clientIpHeaders } from "@/lib/client-ip";
-import { loginUrl, sessionEndReasonFromCode, type SessionEndReason } from "@/lib/session-end";
-import {
-  ACCESS_COOKIE,
-  REFRESH_COOKIE,
-  ACCESS_MAX_AGE,
-  REFRESH_MAX_AGE,
-  COOKIE_OPTS,
-} from "@/lib/auth-cookies";
+import { loginUrl } from "@/lib/session-end";
+import { LEGACY_COOKIES, SESSION_COOKIE } from "@/lib/auth-cookies";
+import { isPublicPath } from "@/lib/public-routes";
 
-const PUBLIC_PATHS = [
-  "/login",
-  "/register",
-  "/forgot-password",
-  "/reset-password",
-  "/verify-email",
-];
-
-// Xem danh sách/chi tiết job không cần đăng nhập — đúng như Flask
-// (/, /jobs, /jobs/more, /jobs/<id> không có @login_required) và là
-// điều kiện để SEO (Phần 4 mục 3) hoạt động.
-// KHÔNG dùng startsWith("/jobs"): sẽ vô tình mở luôn /jobs/add và
-// /jobs/[id]/edit.
-function isPublicJobRoute(p: string): boolean {
-  if (p === "/" || p === "/jobs" || p === "/jobs/more") return true;
-  if (p === "/jobs/add") return false;
-  return /^\/jobs\/[^/]+$/.test(p);
-}
-
-type RefreshResult =
-  | { ok: true; accessToken: string; refreshToken: string }
-  | { ok: false; reason: "invalid"; endReason: SessionEndReason | null }
-  | { ok: false; reason: "error" };
-
-/**
- * Gọi thẳng /auth/refresh bằng fetch() (không qua lib/api/auth.ts —
- * xem lý do ở comment đầu file). Phân biệt rõ 2 loại thất bại vì hệ quả
- * khác hẳn nhau:
- *   - "invalid" (401/403): backend đã XÁC NHẬN refresh token không hợp
- *     lệ/hết hạn/đã bị thu hồi thật (kể cả bị thu hồi do "nghi đánh cắp"
- *     — backend đã tự xử lý grace period 10s cho race hợp lệ ngay trong
- *     /auth/refresh, xem chat238.txt; còn trả 401/403 tới đây nghĩa là
- *     chắc chắn không phải race) -> phải dọn phiên thật sự.
- *   - "error" (429/5xx/timeout/mất mạng, kể cả backend Render đang "ngủ"
- *     — Phụ lục E của plan) -> lỗi hạ tầng tạm thời, KHÔNG nói lên gì về
- *     tính hợp lệ của phiên -> không được dọn cookie (đúng nguyên tắc ở
- *     lib/api/client.ts::callAuthed, chỉ xoá cookie khi refresh XÁC NHẬN
- *     token sai, không xoá vì lỗi hạ tầng).
- */
-async function tryRefresh(
-  refreshToken: string,
-  reqHeaders: Headers,
-): Promise<RefreshResult> {
-  try {
-    const res = await fetch(`${process.env.CRAWLER_API_URL}/auth/refresh`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-API-Key": process.env.CRAWLER_API_KEY!,
-        // IP thật của người dùng cuối cho rate limit /auth/refresh (plan
-        // Phần 1 mục 3.14). Proxy không dùng được next/headers nên
-        // đọc thẳng từ request.
-        ...clientIpHeaders(reqHeaders),
-      },
-      body: JSON.stringify({ refresh_token: refreshToken }),
-      cache: "no-store",
-    });
-
-    if (res.ok) {
-      const data = (await res.json()) as { access_token: string; refresh_token: string };
-      return { ok: true, accessToken: data.access_token, refreshToken: data.refresh_token };
-    }
-
-    if (res.status === 401 || res.status === 403) {
-      // Đọc error_code để biết có phải "refresh token đã bị thu hồi vì đăng
-      // nhập nơi khác" không (Phụ lục C) — hết hạn thường thì endReason
-      // null, redirect /login im lặng như cũ. Body hỏng/không JSON -> null.
-      let endReason: SessionEndReason | null = null;
-      try {
-        const body = (await res.json()) as { detail?: { error_code?: string } };
-        endReason = sessionEndReasonFromCode(body?.detail?.error_code);
-      } catch {
-        // bỏ qua
-      }
-      return { ok: false, reason: "invalid", endReason };
-    }
-    return { ok: false, reason: "error" };
-  } catch {
-    return { ok: false, reason: "error" };
-  }
-}
-
-export async function proxy(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  const isPublic =
-    PUBLIC_PATHS.some((p) => pathname.startsWith(p)) || isPublicJobRoute(pathname);
+  const hasSession = Boolean(req.cookies.get(SESSION_COOKIE)?.value);
+  const staleCookies = LEGACY_COOKIES.filter((name) => req.cookies.has(name));
 
-  let accessToken = req.cookies.get(ACCESS_COOKIE)?.value ?? null;
-  let refreshToken = req.cookies.get(REFRESH_COOKIE)?.value ?? null;
-
-  let newTokens: { access: string; refresh: string } | null = null;
-  let shouldClearCookies = false;
-  let endReason: SessionEndReason | null = null;
-
-  const needsRefresh = refreshToken !== null && (!accessToken || isExpiredSoon(accessToken));
-
-  if (needsRefresh) {
-    const result = await tryRefresh(refreshToken!, req.headers);
-    if (result.ok) {
-      newTokens = { access: result.accessToken, refresh: result.refreshToken };
-      accessToken = result.accessToken;
-      refreshToken = result.refreshToken;
-    } else if (result.reason === "invalid") {
-      shouldClearCookies = true;
-      endReason = result.endReason;
-      accessToken = null;
-      refreshToken = null;
-    }
-    // reason === "error": giữ nguyên accessToken/refreshToken hiện có
-    // (dù accessToken có thể đã hết hạn) — nhường lại cho lớp dự phòng
-    // getValidAccessToken()/forceRefreshAccessToken() ở Server Component
-    // tự thử lại theo đúng nguyên tắc trên.
+  let response: NextResponse;
+  if (!isPublicPath(pathname) && !hasSession) {
+    // `next` là pathname do chính proxy đọc từ request, không phải giá trị người dùng gõ vào
+    // query string; /login vẫn kiểm lại bằng safeInternalPath() trước khi dùng.
+    response = NextResponse.redirect(new URL(loginUrl({ next: pathname }), req.url));
+  } else {
+    // Header đi vào request của Server Component phía sau (auth-guard đọc lại pathname).
+    const requestHeaders = new Headers(req.headers);
+    requestHeaders.set("x-invoke-path", pathname);
+    response = NextResponse.next({ request: { headers: requestHeaders } });
   }
 
-  // Route cần-login: chặn sớm nếu sau tất cả vẫn không còn token nào
-  // (chưa từng đăng nhập, hoặc refresh vừa xác nhận phiên đã chết hẳn).
-  // Route public KHÔNG redirect trong mọi trường hợp — chỉ khác ở chỗ
-  // này, phần refresh phía trên áp dụng như nhau cho cả 2 loại route.
-  if (!isPublic && !accessToken && !refreshToken) {
-    // Dùng chung loginUrl() với auth-guard (cùng thứ tự/tên tham số); phần
-    // `next` ở đây là pathname do chính proxy đọc từ request, không phải giá
-    // trị người dùng gõ vào query string.
-    const redirectRes = NextResponse.redirect(
-      new URL(loginUrl({ next: pathname, reason: endReason }), req.url),
-    );
-    if (shouldClearCookies) {
-      redirectRes.cookies.delete(ACCESS_COOKIE);
-      redirectRes.cookies.delete(REFRESH_COOKIE);
-    }
-    return redirectRes;
-  }
-
-  // Ghi token mới (nếu có) vào chính cookie của request này TRƯỚC khi
-  // build requestHeaders, để Server Component phía sau (đọc qua
-  // cookies() của next/headers, vd getValidAccessToken()) thấy token mới
-  // NGAY trong cùng request này — không phải đợi round-trip kế tiếp mới
-  // nhận qua Set-Cookie. req.cookies dùng chung 1 Headers instance với
-  // req.headers nên set/delete ở đây tự phản ánh sang req.headers.
-  if (newTokens) {
-    req.cookies.set(ACCESS_COOKIE, newTokens.access);
-    req.cookies.set(REFRESH_COOKIE, newTokens.refresh);
-  } else if (shouldClearCookies) {
-    req.cookies.delete(ACCESS_COOKIE);
-    req.cookies.delete(REFRESH_COOKIE);
-  }
-
-  // Set header để lib/auth-guard.ts đọc lại pathname hiện tại trong
-  // Server Component (Next.js không có API chính thức khác cho việc này).
-  const requestHeaders = new Headers(req.headers);
-  requestHeaders.set("x-invoke-path", pathname);
-
-  const response = NextResponse.next({ request: { headers: requestHeaders } });
-
-  // Ghi Set-Cookie cho trình duyệt (để các request SAU của browser cũng
-  // dùng token mới) — làm SONG SONG với việc ghi vào req.cookies ở trên,
-  // không thay thế cho nhau: req.cookies chỉ ảnh hưởng request hiện tại,
-  // response.cookies mới là thứ trình duyệt thực sự nhận được.
-  if (newTokens) {
-    response.cookies.set(ACCESS_COOKIE, newTokens.access, {
-      ...COOKIE_OPTS,
-      maxAge: ACCESS_MAX_AGE,
-    });
-    response.cookies.set(REFRESH_COOKIE, newTokens.refresh, {
-      ...COOKIE_OPTS,
-      maxAge: REFRESH_MAX_AGE,
-    });
-  } else if (shouldClearCookies) {
-    response.cookies.delete(ACCESS_COOKIE);
-    response.cookies.delete(REFRESH_COOKIE);
-  }
-
+  for (const name of staleCookies) response.cookies.delete(name);
   return response;
 }
 

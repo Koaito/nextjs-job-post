@@ -9,7 +9,6 @@ import {
 describe("sessionEndReasonFromCode", () => {
   it("map đúng theo GIÁ TRỊ CHUỖI THẬT của backend (chữ thường)", () => {
     expect(sessionEndReasonFromCode("session_replaced")).toBe("replaced");
-    expect(sessionEndReasonFromCode("auth_refresh_token_thu_hoi_truoc")).toBe("replaced");
     expect(sessionEndReasonFromCode("session_revoked")).toBe("revoked");
   });
 
@@ -17,6 +16,10 @@ describe("sessionEndReasonFromCode", () => {
     expect(sessionEndReasonFromCode("SESSION_REPLACED")).toBeNull();
     expect(sessionEndReasonFromCode("SESSION_REVOKED")).toBeNull();
     expect(sessionEndReasonFromCode("AUTH_REFRESH_TOKEN_ALREADY_REVOKED")).toBeNull();
+  });
+
+  it("mã của /auth/refresh cũ không còn được nhận (frontend không gọi refresh nữa)", () => {
+    expect(sessionEndReasonFromCode("auth_refresh_token_thu_hoi_truoc")).toBeNull();
   });
 
   it("hết hạn thường (auth_expired_2, auth_invalid_2) và mã lạ -> null (im lặng)", () => {

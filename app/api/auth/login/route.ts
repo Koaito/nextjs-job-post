@@ -1,11 +1,12 @@
 // app/api/auth/login/route.ts
 // BFF: nhận request từ browser (không cần biết CRAWLER_API_KEY), forward
-// sang Scrap_JD, rồi set 2 cookie httpOnly + trả JSON gọn cho client.
+// sang Scrap_JD, rồi set 1 cookie httpOnly chứa session token + trả JSON gọn cho client.
+// Cặp access/refresh cũ mà backend vẫn trả (cho client cũ) bị BỎ: không lưu, không log.
 // (Phần 2 mục 1 của plan)
 
 import { NextRequest, NextResponse } from "next/server";
 import { login, getMe } from "@/lib/api/auth";
-import { setAuthCookies } from "@/lib/session";
+import { setSessionCookie } from "@/lib/session";
 import { ApiError } from "@/lib/api/client";
 import { verifyOrigin } from "@/lib/verify-origin";
 
@@ -30,9 +31,10 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const tokens = await login(email, password);
-    await setAuthCookies(tokens.access_token, tokens.refresh_token);
-    const user = await getMe(tokens.access_token);
+    const session = await login(email, password);
+    // getMe TRƯỚC khi ghi cookie: nếu token vừa nhận bị từ chối thì không để lại cookie rác.
+    const user = await getMe(session.sessionToken);
+    await setSessionCookie(session.sessionToken, session.sessionExpiresAt);
     return NextResponse.json({ ok: true, user });
   } catch (err) {
     if (err instanceof ApiError) {
