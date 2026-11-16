@@ -31,5 +31,7 @@ FROM (VALUES
     ('E2E PwChange Student',  'pwchange@e2e.test',     'user'),
     ('E2E Revoke Student',    'revoke@e2e.test',       'user'),
     ('E2E Expiry Student',    'expiry@e2e.test',       'user'),
-    ('E2E Locked Student',    'locked@e2e.test',       'user')
+    ('E2E Locked Student',    'locked@e2e.test',       'user'),
+    ('E2E Data Staff',        'data-staff@e2e.test',   'ss_team'),
+    ('E2E Data Student',      'data-student@e2e.test', 'user')
 ) AS v(full_name, email, role);

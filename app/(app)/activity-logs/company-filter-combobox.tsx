@@ -32,10 +32,14 @@ interface CompanyHit {
 export function CompanyFilterCombobox({
   initialId,
   initialName,
+  onChange,
 }: {
   initialId: string;
   /** Tên công ty đang lọc (page tải sẵn); rỗng nếu không tải được. */
   initialName: string;
+  /** Gọi mỗi khi chọn công ty (id rỗng = "Mọi công ty"). Dùng khi ô nằm trong form điều khiển
+   *  bằng state (vd bộ lọc Xuất dữ liệu ở /data-management) thay vì <form method="get">. */
+  onChange?: (hit: { id: string; name: string }) => void;
 }) {
   const [selected, setSelected] = useState<CompanyHit>({ id: initialId, name: initialName });
   const [open, setOpen] = useState(false);
@@ -95,6 +99,7 @@ export function CompanyFilterCombobox({
     setSelected(hit);
     setOpen(false);
     setQuery("");
+    onChange?.({ id: hit.id, name: hit.name });
   }
 
   // Có company_id nhưng chưa lấy được tên (getCompany lỗi) -> vẫn báo đang
