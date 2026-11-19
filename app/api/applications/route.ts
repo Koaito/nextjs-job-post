@@ -24,6 +24,8 @@ import { getCurrentUser } from "@/lib/session";
 import { verifyOrigin } from "@/lib/verify-origin";
 
 export const dynamic = "force-dynamic";
+// Trần thời gian chạy (giây): số viết thẳng vì Next đọc tĩnh. Mức và lý do ở tests/lib/route-max-duration.test.ts.
+export const maxDuration = 180;
 
 const NO_STORE = { "Cache-Control": "no-store" } as const;
 const MAX_CV_BYTES = 5 * 1024 * 1024; // khớp backend: tối đa 5MB

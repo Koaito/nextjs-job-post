@@ -4,13 +4,13 @@
 // Cả hai panel dựng ngay nhưng chỉ panel đang chọn hiện ra (hidden), để chuyển tab không làm mất
 // kết quả xem trước / bộ lọc đang nhập.
 //
-// Phần 2/3 sẽ thay khung "sắp có" bên dưới bằng panel Nhập dữ liệu thật.
+// Tab Nhập dữ liệu (phần 2/3) dựng sẵn như tab Xuất, nên chuyển tab không làm mất file đang xem lại.
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import type { DataEntityType } from "@/lib/data-ops/export-filters";
-import { DATA_ENTITY_LABELS } from "@/lib/data-ops/export-ui";
 import { ExportPanel } from "./export-panel";
+import { ImportPanel } from "./import-panel";
 
 type TabId = "export" | "import";
 
@@ -19,7 +19,14 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "import", label: "Nhập dữ liệu" },
 ];
 
-export function DataManagementTabs({ entity }: { entity: DataEntityType }) {
+export function DataManagementTabs({
+  entity,
+  levelCodes,
+}: {
+  entity: DataEntityType;
+  /** Level hợp lệ (GET /enums) cho ô chọn lại level của dòng Job. */
+  levelCodes: string[];
+}) {
   const [tab, setTab] = useState<TabId>("export");
 
   return (
@@ -54,10 +61,7 @@ export function DataManagementTabs({ entity }: { entity: DataEntityType }) {
       </div>
 
       <div id="dm-panel-import" role="tabpanel" aria-labelledby="dm-tab-import" hidden={tab !== "import"}>
-        <p className="rounded-md border border-dashed px-4 py-6 text-sm text-muted-foreground">
-          Nhập {DATA_ENTITY_LABELS[entity]} từ file CSV/XLSX sẽ có ở bản cập nhật tiếp theo (phần 2/3 của
-          nhóm 6).
-        </p>
+        <ImportPanel entity={entity} levelCodes={levelCodes} />
       </div>
     </div>
   );

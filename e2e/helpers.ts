@@ -23,6 +23,10 @@ export const ACCOUNTS = {
   locked: { email: "locked@e2e.test", name: "E2E Locked Student" },
   dataStaff: { email: "data-staff@e2e.test", name: "E2E Data Staff" },
   dataStudent: { email: "data-student@e2e.test", name: "E2E Data Student" },
+  importStaff: { email: "import-staff@e2e.test", name: "E2E Import Staff" },
+  crawlStaff: { email: "crawl-staff@e2e.test", name: "E2E Crawl Staff" },
+  crawlAdmin: { email: "crawl-admin@e2e.test", name: "E2E Crawl Admin" },
+  crawlStudent: { email: "crawl-student@e2e.test", name: "E2E Crawl Student" },
 } as const;
 
 /** Điền form /login và gửi. Không chờ điều hướng: mỗi test tự khẳng định nơi đến. */

@@ -16,6 +16,9 @@ const API_KEY = process.env.CRAWLER_API_KEY;
 const GENERIC_MESSAGE =
   "Nếu email tồn tại và chưa xác thực, link mới đã được gửi — kiểm tra hộp thư.";
 
+// Trần thời gian chạy (giây): số viết thẳng vì Next đọc tĩnh. Mức và lý do ở tests/lib/route-max-duration.test.ts.
+export const maxDuration = 120;
+
 export async function POST(req: NextRequest) {
   const originCheck = verifyOrigin(req);
   if (!originCheck.ok) {

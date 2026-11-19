@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 
 // Rà soát TĨNH mọi Route Handler ghi dữ liệu (POST/PUT/PATCH/DELETE) dưới app/api: phải kiểm nguồn gốc request
@@ -27,7 +27,8 @@ function exportedMethods(source: string): string[] {
 }
 
 const mutatingRoutes = routeFiles(API_DIR)
-  .map((file) => ({ file: relative(API_DIR, file), source: readFileSync(file, "utf8") }))
+  // Chuẩn hoá về "/" để test chạy giống nhau trên Windows (relative() trả về "\\") và Linux (CI).
+  .map((file) => ({ file: relative(API_DIR, file).split(sep).join("/"), source: readFileSync(file, "utf8") }))
   .filter(({ source }) => exportedMethods(source).some((m) => (MUTATING as readonly string[]).includes(m)));
 
 /** Bỏ chú thích để dòng comment có chữ `verifyOrigin(` không đánh lừa được bộ kiểm. */

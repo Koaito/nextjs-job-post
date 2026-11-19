@@ -28,6 +28,57 @@ export class ApiError extends Error {
 }
 
 /**
+ * Thời gian tối đa chờ backend PHẢN HỒI (tính tới lúc nhận header, không tính lúc đọc body). Backend chạy trên
+ * Render free tier: ngủ sau một thời gian không có request, khởi động lại mất cỡ một phút. Quá hạn này thì báo lỗi
+ * có thông điệp rõ ràng thay vì để người dùng chờ tới giới hạn của nền tảng (mặc định 300 giây).
+ *   - lời gọi JSON thường: 60 giây
+ *   - lời gọi stream (tải file export, upload file import/CV): 120 giây, vì phải gửi/nhận cả file
+ * Chỉ áp cho lời gọi đi qua fetchOk. GET /auth/me (lời gọi đầu tiên của mọi trang, cũng là lời gọi đánh thức Render)
+ * và POST /auth/login ở lib/api/auth.ts CỐ Ý không có timeout: lỗi ở đó bị coi như "chưa đăng nhập", nên một lần
+ * Render khởi động chậm sẽ đá người dùng về /login oan.
+ */
+export const API_TIMEOUT_MS = 60_000;
+export const API_STREAM_TIMEOUT_MS = 120_000;
+
+export const UPSTREAM_TIMEOUT_CODE = "upstream_timeout";
+export const UPSTREAM_TIMEOUT_MESSAGE =
+  "Máy chủ phản hồi quá lâu (có thể đang khởi động lại). Vui lòng thử lại sau ít giây.";
+
+/** RequestInit + `timeoutMs` riêng của lib này (không được truyền xuống fetch). */
+export type ApiInit = RequestInit & { timeoutMs?: number };
+
+/**
+ * fetch có hạn chờ. Hết hạn -> ApiError 504 mã `upstream_timeout`. Hạn chờ dừng ngay khi có header phản hồi nên không
+ * cắt ngang việc đọc body. Người gọi tự huỷ (init.signal) thì ném nguyên lỗi huỷ, không gọi là timeout.
+ * Lỗi mạng khác (từ chối kết nối, DNS...) giữ nguyên là TypeError như trước: các route đã xử lý nó (502).
+ */
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const callerSignal = init.signal ?? undefined;
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
+  const onCallerAbort = () => controller.abort(callerSignal?.reason);
+  if (callerSignal) {
+    if (callerSignal.aborted) controller.abort(callerSignal.reason);
+    else callerSignal.addEventListener("abort", onCallerAbort, { once: true });
+  }
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (err) {
+    if (timedOut && !callerSignal?.aborted) {
+      throw new ApiError(UPSTREAM_TIMEOUT_MESSAGE, 504, UPSTREAM_TIMEOUT_CODE);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+    callerSignal?.removeEventListener("abort", onCallerAbort);
+  }
+}
+
+/**
  * Gọi thẳng Scrap_JD, không xử lý auth — chỉ lo phần forward
  * request + parse lỗi đúng 3 hình dạng JSON thật mà backend trả về.
  *
@@ -38,9 +89,11 @@ export class ApiError extends Error {
  */
 async function fetchOk(
   path: string,
-  init: RequestInit = {},
+  apiInit: ApiInit = {},
   token?: string,
+  defaultTimeoutMs: number = API_TIMEOUT_MS,
 ): Promise<Response> {
+  const { timeoutMs = defaultTimeoutMs, ...init } = apiInit;
   // Body là FormData (multipart, vd nộp CV — POST /me/applications) thì
   // TUYỆT ĐỐI không tự đặt Content-Type: fetch phải tự sinh header kèm
   // `boundary=...`, ép "application/json" sẽ làm backend không parse được
@@ -57,7 +110,7 @@ async function fetchOk(
   const isCached = hasRevalidate || (init.cache ?? "no-store") !== "no-store";
   const clientIp = isCached ? {} : await getClientIpHeaders();
 
-  const res = await fetch(`${process.env.CRAWLER_API_URL}${path}`, {
+  const res = await fetchWithTimeout(`${process.env.CRAWLER_API_URL}${path}`, {
     ...init,
     headers: {
       ...(isFormData ? {} : { "Content-Type": "application/json" }),
@@ -78,7 +131,7 @@ async function fetchOk(
     // cache 5 phút như plan. `...init` ở trên đã mang sẵn `cache` nếu
     // caller tự truyền.
     ...(hasRevalidate ? {} : { cache: init.cache ?? "no-store" }),
-  });
+  }, timeoutMs);
 
   if (!res.ok) {
     // Đọc body dạng text rồi tự JSON.parse (thay vì res.json().catch) để
@@ -132,7 +185,7 @@ async function fetchOk(
 /** fetchOk + parse JSON — cho mọi route trả JSON (đa số). */
 async function rawFetch<T>(
   path: string,
-  init: RequestInit = {},
+  init: ApiInit = {},
   token?: string,
 ): Promise<T> {
   const res = await fetchOk(path, init, token);
@@ -153,7 +206,7 @@ async function rawFetch<T>(
  */
 export async function callAuthed<T>(
   path: string,
-  init: RequestInit = {},
+  init: ApiInit = {},
 ): Promise<T> {
   const token = await getSessionToken();
   return rawFetch<T>(path, init, token ?? undefined);
@@ -172,10 +225,10 @@ export async function callAuthed<T>(
  */
 export async function callAuthedStream(
   path: string,
-  init: RequestInit = {},
+  init: ApiInit = {},
 ): Promise<Response> {
   const token = await getSessionToken();
-  return fetchOk(path, init, token ?? undefined);
+  return fetchOk(path, init, token ?? undefined, API_STREAM_TIMEOUT_MS);
 }
 
 /** Dùng cho các route KHÔNG cần auth nhưng vẫn cần X-API-Key (vd GET /sources,
@@ -183,7 +236,7 @@ export async function callAuthedStream(
  *  về các route cố tình không đòi requireStaff(). */
 export async function callPublic<T>(
   path: string,
-  init: RequestInit = {},
+  init: ApiInit = {},
 ): Promise<T> {
   return rawFetch<T>(path, init);
 }

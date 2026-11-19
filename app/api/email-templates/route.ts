@@ -21,6 +21,8 @@ import { getCurrentUser } from "@/lib/session";
 import { listEmailTemplates } from "@/lib/api/email-templates";
 
 export const dynamic = "force-dynamic";
+// Trần thời gian chạy (giây): số viết thẳng vì Next đọc tĩnh. Mức và lý do ở tests/lib/route-max-duration.test.ts.
+export const maxDuration = 120;
 
 const NO_STORE = { "Cache-Control": "no-store" } as const;
 

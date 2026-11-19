@@ -31,6 +31,8 @@ import { ApiError } from "@/lib/api/client";
 import { getApplicantCvUrl } from "@/lib/api/applications";
 
 export const dynamic = "force-dynamic";
+// Trần thời gian chạy (giây): số viết thẳng vì Next đọc tĩnh. Mức và lý do ở tests/lib/route-max-duration.test.ts.
+export const maxDuration = 180;
 
 function escapeHtml(text: string): string {
   return text
