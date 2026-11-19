@@ -19,6 +19,7 @@ import {
   type MaintenanceJobType,
   type MaintenanceRunRequest,
 } from "@/lib/data-ops/maintenance";
+import { UPSTREAM_TIMEOUT_MESSAGE, isUpstreamTimeout } from "@/lib/upstream-timeout";
 
 export interface MaintenanceFormErrors {
   limit?: string;
@@ -115,6 +116,7 @@ export function maintenanceTriggerErrorMessage(status: number, errorCode?: strin
   if (status === 403) return "Chỉ admin mới được chạy job bảo trì.";
   if (status === 413) return "Dữ liệu gửi lên quá lớn.";
   if (status === 0) return "Không kết nối được máy chủ. Vui lòng thử lại.";
+  if (isUpstreamTimeout(status, errorCode)) return UPSTREAM_TIMEOUT_MESSAGE;
   if (status >= 500) return "Máy chủ dữ liệu đang gặp sự cố. Vui lòng thử lại sau.";
   return fallback || "Không chạy được job bảo trì. Vui lòng kiểm tra lại lựa chọn.";
 }

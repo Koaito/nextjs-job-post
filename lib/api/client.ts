@@ -10,6 +10,10 @@
 
 import { getSessionToken } from "@/lib/session";
 import { getClientIpHeaders } from "@/lib/client-ip-server";
+import { UPSTREAM_TIMEOUT_CODE, UPSTREAM_TIMEOUT_MESSAGE } from "@/lib/upstream-timeout";
+
+// Định nghĩa ở lib/upstream-timeout.ts (module thuần để client component cũng import được); re-export giữ đường import cũ.
+export { UPSTREAM_TIMEOUT_CODE, UPSTREAM_TIMEOUT_MESSAGE };
 
 export class ApiError extends Error {
   constructor(
@@ -40,9 +44,6 @@ export class ApiError extends Error {
 export const API_TIMEOUT_MS = 60_000;
 export const API_STREAM_TIMEOUT_MS = 120_000;
 
-export const UPSTREAM_TIMEOUT_CODE = "upstream_timeout";
-export const UPSTREAM_TIMEOUT_MESSAGE =
-  "Máy chủ phản hồi quá lâu (có thể đang khởi động lại). Vui lòng thử lại sau ít giây.";
 
 /** RequestInit + `timeoutMs` riêng của lib này (không được truyền xuống fetch). */
 export type ApiInit = RequestInit & { timeoutMs?: number };

@@ -14,6 +14,7 @@ import {
   type ExportDateField,
   type ExportFilters,
 } from "./export-filters";
+import { UPSTREAM_TIMEOUT_MESSAGE, isUpstreamTimeout } from "@/lib/upstream-timeout";
 
 export const DATA_ENTITY_LABELS: Record<DataEntityType, string> = {
   job: "Job",
@@ -119,6 +120,7 @@ export function exportHttpErrorMessage(status: number | undefined, fallback?: st
   if (status === 401) return "Phiên đăng nhập đã hết. Vui lòng tải lại trang và đăng nhập lại.";
   if (status === 403 || status === 404) return "Bạn không có quyền dùng chức năng này.";
   if (status === 429) return "Bạn thao tác quá nhanh, vui lòng thử lại sau ít phút.";
+  if (isUpstreamTimeout(status)) return UPSTREAM_TIMEOUT_MESSAGE;
   if (status !== undefined && status >= 500) return "Máy chủ đang bận hoặc gặp lỗi, vui lòng thử lại sau.";
   return fallback || "Không thực hiện được yêu cầu.";
 }
