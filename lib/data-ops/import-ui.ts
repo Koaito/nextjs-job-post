@@ -18,6 +18,7 @@ import {
   type ImportPreviewRow,
   type ImportResolutionAction,
 } from "./import";
+import { UPSTREAM_TIMEOUT_MESSAGE, isUpstreamTimeout } from "@/lib/upstream-timeout";
 
 // ---------------------------------------------------------------------------
 // Nhãn
@@ -151,6 +152,7 @@ export function importHttpErrorMessage(
   if (status === 429) {
     return "Bạn thao tác quá nhanh (tối đa 20 lượt tải file mỗi giờ). Vui lòng thử lại sau ít phút.";
   }
+  if (isUpstreamTimeout(status, errorCode)) return UPSTREAM_TIMEOUT_MESSAGE;
   if (status !== undefined && status >= 500) return "Máy chủ đang bận hoặc gặp lỗi, vui lòng thử lại sau.";
   return fallback || "Không thực hiện được yêu cầu.";
 }

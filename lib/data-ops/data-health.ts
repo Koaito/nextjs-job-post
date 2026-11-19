@@ -7,6 +7,7 @@
 // chung một tên thì bấm trang 2 ở bảng này sẽ kéo bảng kia theo.
 
 import { parsePageParam } from "@/lib/data-ops/crawl-history";
+import { UPSTREAM_TIMEOUT_MESSAGE, isUpstreamTimeout } from "@/lib/upstream-timeout";
 
 // ---------------------------------------------------------------------------
 // Ghi chú đóng job (activity_note / `note` của PATCH /jobs/{id}, ghi vào lịch sử thao tác)
@@ -131,6 +132,7 @@ export function closeJobErrorMessage(status: number | undefined, fallback?: stri
   if (status === 503) return fallback || "Có thao tác khác đang ghi job cùng công ty. Đợi vài giây rồi thử lại.";
   if (status === 401) return "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
   if (status === 403) return "Bạn không có quyền đóng job.";
+  if (isUpstreamTimeout(status)) return UPSTREAM_TIMEOUT_MESSAGE;
   if (status !== undefined && status >= 500) return "Máy chủ dữ liệu đang gặp sự cố. Vui lòng thử lại sau.";
   return "Không đóng được job. Vui lòng thử lại.";
 }

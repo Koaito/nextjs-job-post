@@ -10,6 +10,7 @@ import {
   CRAWL_PAGES_MIN,
   type CrawlBatchRequest,
 } from "@/lib/data-ops/crawl";
+import { UPSTREAM_TIMEOUT_MESSAGE, isUpstreamTimeout } from "@/lib/upstream-timeout";
 
 /** Tối đa category mỗi batch (khớp CrawlBatchRequest.categories max_length=20). */
 export const CRAWL_BATCH_MAX_CATEGORIES = 20;
@@ -121,6 +122,7 @@ export function crawlTriggerErrorMessage(status: number, errorCode?: string, fal
   if (status === 403) return "Chỉ admin mới được chạy crawl.";
   if (status === 413) return "Dữ liệu gửi lên quá lớn.";
   if (status === 0) return "Không kết nối được máy chủ. Vui lòng thử lại.";
+  if (isUpstreamTimeout(status, errorCode)) return UPSTREAM_TIMEOUT_MESSAGE;
   if (status >= 500) return "Máy chủ dữ liệu đang gặp sự cố. Vui lòng thử lại sau.";
   return fallback || "Không chạy được crawl. Vui lòng kiểm tra lại lựa chọn.";
 }
