@@ -61,7 +61,16 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          CRAWLER_API_URL: http://localhost:8000
+          CRAWLER_API_URL: http://ci-dummy-backend.invalid:8000
           CRAWLER_API_KEY: ci-dummy-key-not-a-secret
           NEXT_PUBLIC_APP_URL: http://localhost:3000
           NEXT_TELEMETRY_DISABLED: "1"
+
+      # Quét mã gửi xuống TRÌNH DUYỆT (.next/static): khoá và URL backend không được lộ (giá trị GIẢ ở trên cũng
+      # bị dò, vì lộ giá trị giả nghĩa là cơ chế lộ đã có; tên biến server xuất hiện nghĩa là một module
+      # server-only bị import nhầm vào Client Component). Phải dùng đúng giá trị đã build.
+      - name: Kiểm tra không lộ khoá trong bundle client
+        run: npm run check:secrets
+        env:
+          CRAWLER_API_URL: http://ci-dummy-backend.invalid:8000
+          CRAWLER_API_KEY: ci-dummy-key-not-a-secret

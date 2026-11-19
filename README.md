@@ -54,12 +54,37 @@ sinh lại sẽ làm CI đỏ. CI **không** tự biết backend đã đổi: b�
 ## Test e2e (Playwright)
 
 `e2e/` chạy trình duyệt thật → Next.js (bản build) → backend Scrap JD thật → Postgres thật, không mock gì ở giữa.
-Hiện có 5 spec: `auth` (đăng nhập, đăng xuất, chặn khách, chống open-redirect, verify-origin, `session_replaced`),
+Hiện có 7 spec: `auth` (đăng nhập, đăng xuất, chặn khách, chống open-redirect, verify-origin, `session_replaced`),
 `session-lifecycle` (đổi mật khẩu, thu hồi phiên phía server, cookie hỏng, hết hạn, tài khoản bị khoá),
 `jobs-public` (xem `/jobs` khi chưa đăng nhập, phân trang, lọc, 404) và `messages` (yêu cầu nhắn tin, chấp nhận,
 polling, tin chứa HTML hiện thành chữ thô) và `data-management` (quyền truy cập, xem trước rồi mới tải,
-nút tải tắt khi bộ lọc đổi, tải CSV thật, đổi entity). Các ca hết hạn / khoá tài khoản chỉnh thẳng DB e2e nên cần
-`E2E_DATABASE_URL` (không đặt thì tự bỏ qua).
+nút tải tắt khi bộ lọc đổi, tải CSV thật, đổi entity) và `data-import` (tab Nhập dữ liệu: file bị từ chối, sửa ô
+lỗi, chọn level, chọn công ty, cặp liên hệ trùng trong file, ghi chú bắt buộc, nhập thật Company/Contact; không tạo Job
+thật vì `jobs-public` đếm đúng 23 job). Các ca hết hạn / khoá tài khoản chỉnh thẳng DB e2e nên cần
+`E2E_DATABASE_URL` (không đặt thì tự bỏ qua). Spec `crawl` (`/crawl`, phần 3a–3d: quyền truy cập, 4 tab, widget "Đang chạy"
+hiện chéo, polling dừng khi sang tab Lịch sử, hai bảng lịch sử lọc/phân trang độc lập, tab Crawl: checklist batch,
+log live, form chạy và route POST chỉ admin; tab Bảo trì: 5 thẻ, số liệu theo job, log gộp một request, form theo
+quy tắc từng job, route POST chỉ admin, ca lượt đang chạy xong chuyển trạng thái qua DB e2e) đọc dữ liệu lịch sử nạp sẵn trong
+`e2e/seed.sql` và KHÔNG bấm chạy crawl/bảo trì thật (sẽ gọi TopCV/Tavily/Gemini). Ca "chạy" duy nhất nhắm vào nguồn `careerviet` (seed
+đang có lượt chạy dở) nên backend trả 409 ngay ở bước tạo run, trước khi có tác vụ nền nào chạy; mỗi lần chạy spec chạm
+backend đúng 1 lần ở POST crawl và 1 lần ở POST bảo trì (backend giới hạn 10 lượt/giờ/người, tính riêng từng route).
+Tab Bảo trì: ca 409 nhắm vào `check_expired_jobs` (seed đang có lượt chạy dở); ca 429 trên thẻ giả lập ở trình duyệt vì
+không thể tạo thật mà không đốt hạn mức. Ca "lượt đang chạy xong" cần `E2E_DATABASE_URL` (tự bỏ qua nếu thiếu) và tự trả DB về như seed.
+Spec `data-health` (`/crawl?tab=status`, phần 3e): số liệu thiếu field của job/công ty, nhóm job nghi trùng kèm gợi ý
+"Nên giữ" do backend tính, job hết hạn nhưng vẫn Đang tuyển, hai bảng phân trang độc lập (`dup_page`, `exp_page`), nút
+"Đóng job này" đóng THẬT qua PATCH /jobs/{id} bằng tài khoản ss_team rồi kiểm `audit_logs` (ghi chú cố định do server điền).
+Dữ liệu seed gốc không có nhóm trùng/job hết hạn nên ca đầu kiểm trạng thái rỗng (chạy khi KHÔNG đặt `E2E_DATABASE_URL`);
+các ca còn lại tự chèn job `E2E-HEALTH-*` bằng SQL và dọn ở `afterAll` (cần `E2E_DATABASE_URL`), vì `jobs-public` đếm đúng 23 job.
+Spec `crawl-tabs` (phần 3f, hành vi chéo tab): mỗi tab chỉ gọi endpoint của nó (tab Lịch sử không có request `/api`
+nào, tab Tình trạng dữ liệu chỉ poll widget, tab Crawl và tab Bảo trì không poll API của nhau), tab trình duyệt bị ẩn thì
+không poll và quay lại thì cập nhật ngay, phiên chết (đăng nhập nơi khác) thì cả 4 tab về `/login?reason=replaced`.
+`reuseExistingServer` bật ngoài CI: nếu còn một `next start` cũ trên cổng 3100 thì Playwright dùng lại nó (bản build cũ,
+nhóm ca này sẽ đỏ giả), nên tắt server cũ trước khi chạy lại sau khi build lại.
+
+Kiểm lộ khoá trong bản build: sau `npm run build`, chạy `npm run check:secrets` (đặt cùng `CRAWLER_API_KEY` và
+`CRAWLER_API_URL` đã dùng khi build). Script quét `.next/static` tìm GIÁ TRỊ khoá/URL backend và TÊN biến server
+(tên xuất hiện nghĩa là một module server-only bị import nhầm vào Client Component); thoát mã 1 nếu phát hiện. CI chạy
+bước này sau Build. `tests/route-guards.test.ts` rà tĩnh mọi route ghi dưới `app/api` phải có `verifyOrigin`.
 
 Chạy local (cần repo backend, Postgres và `psql`):
 
