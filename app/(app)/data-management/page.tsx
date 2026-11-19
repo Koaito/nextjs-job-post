@@ -2,14 +2,15 @@
 // Tương đương data_management.html + blueprints/data_management.py (Flask) — "Xuất / Nhập dữ liệu".
 // Nhóm 6, LÀM THEO 3 PHẦN:
 //   [x] Phần 1/3 — khung trang, chọn entity, tab Xuất dữ liệu (xem trước -> tải Excel/CSV)
-//   [ ] Phần 2/3 — tab Nhập dữ liệu (upload -> preview -> sửa lỗi -> công ty trùng -> confirm)
-//   [ ] Phần 3/3 — /crawl (4 tab)
+//   [x] Phần 2/3 — tab Nhập dữ liệu (upload -> preview -> sửa lỗi -> công ty trùng -> confirm)
+//   [ ] Phần 3/3 — /crawl (4 tab), chia nhỏ 3a–3f: xem app/(app)/crawl/page.tsx
 //
 // CHỈ STAFF: requireStaff() (ss_team là đủ; route import/export không có nhánh admin-only).
 // Đổi entity (Job/Company/Contact) là ĐIỀU HƯỚNG thật (?entity=), nên mỗi entity có URL riêng và
 // state của form lọc tự reset (panel dựng lại theo `key`). Đổi tab Xuất <-> Nhập là thuần client.
 // ?entity= lạ/thiếu -> "job" như Flask, không 404.
 
+import { getLevelCodes } from "@/lib/api/enums";
 import { requireStaff } from "@/lib/auth-guard";
 import { parseEntityParam } from "@/lib/data-ops/export-ui";
 import { DataManagementEntityNav } from "./entity-nav";
@@ -24,6 +25,7 @@ export default async function DataManagementPage({
 }) {
   await requireStaff();
   const entity = parseEntityParam((await searchParams).entity);
+  const levelCodes = await getLevelCodes();
 
   return (
     <div className="space-y-6">
@@ -36,7 +38,7 @@ export default async function DataManagementPage({
       </header>
 
       <DataManagementEntityNav entity={entity} />
-      <DataManagementTabs key={entity} entity={entity} />
+      <DataManagementTabs key={entity} entity={entity} levelCodes={levelCodes} />
     </div>
   );
 }

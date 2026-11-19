@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { ACCOUNTS, DATA_JOB_TITLE, SEED_JOB_COUNT, expect, login, test } from "./helpers";
 
 // /data-management, phần 1/3: tab Xuất dữ liệu. Chạy với backend + Postgres thật (23 job do
-// e2e/global-setup.ts tạo). Tab Nhập dữ liệu chưa làm (phần 2/3) nên chỉ kiểm khung.
+// e2e/global-setup.ts tạo). Tab Nhập dữ liệu có spec riêng: data-import.spec.ts (phần 2/3); ở đây chỉ kiểm chuyển tab.
 
 test.describe("quyền truy cập", () => {
   test("khách bị chuyển về /login", async ({ page }) => {
@@ -93,7 +93,7 @@ test.describe("staff xuất dữ liệu", () => {
     await page.getByRole("button", { name: "Xem trước" }).click();
     await expect(page.getByTestId("export-summary")).toBeVisible();
     await page.getByRole("tab", { name: "Nhập dữ liệu" }).click();
-    await expect(page.getByText("sẽ có ở bản cập nhật tiếp theo")).toBeVisible();
+    await expect(page.getByTestId("import-upload")).toBeVisible();
     await page.getByRole("tab", { name: "Xuất dữ liệu" }).click();
     await expect(page.getByTestId("export-summary")).toBeVisible();
   });

@@ -32,6 +32,8 @@ import { JOBS_PER_PAGE } from "@/lib/constants";
 // Dữ liệu job đổi liên tục + phụ thuộc query string -> không cache,
 // khớp chiến lược cache của GET /jobs (Phần 4 mục 4 của plan).
 export const dynamic = "force-dynamic";
+// Trần thời gian chạy (giây): số viết thẳng vì Next đọc tĩnh. Mức và lý do ở tests/lib/route-max-duration.test.ts.
+export const maxDuration = 120;
 
 export async function GET(req: NextRequest) {
   const params = req.nextUrl.searchParams;

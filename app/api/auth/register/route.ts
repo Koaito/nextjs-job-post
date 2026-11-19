@@ -12,6 +12,9 @@ import { clientIpHeaders } from "@/lib/client-ip";
 const BASE_URL = process.env.CRAWLER_API_URL;
 const API_KEY = process.env.CRAWLER_API_KEY;
 
+// Trần thời gian chạy (giây): số viết thẳng vì Next đọc tĩnh. Mức và lý do ở tests/lib/route-max-duration.test.ts.
+export const maxDuration = 120;
+
 export async function POST(req: NextRequest) {
   const originCheck = verifyOrigin(req);
   if (!originCheck.ok) {

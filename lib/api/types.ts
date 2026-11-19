@@ -3223,6 +3223,8 @@ export interface components {
             position: string;
             /** Jobs */
             jobs: components["schemas"]["JobHealthListItem"][];
+            /** Suggest Keep */
+            suggest_keep?: string | null;
         };
         /**
          * EmailTemplateCreate

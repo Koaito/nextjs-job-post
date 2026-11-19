@@ -9,6 +9,9 @@ import { logout as logoutApi } from "@/lib/api/auth";
 import { clearSessionCookie } from "@/lib/session";
 import { verifyOrigin } from "@/lib/verify-origin";
 
+// Trần thời gian chạy (giây): số viết thẳng vì Next đọc tĩnh. Mức và lý do ở tests/lib/route-max-duration.test.ts.
+export const maxDuration = 120;
+
 export async function POST(req: NextRequest) {
   const originCheck = verifyOrigin(req);
   if (!originCheck.ok) {
